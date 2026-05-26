@@ -73,14 +73,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Stella Cafe & Lounge — Kırklareli" },
+      { name: "description", content: "Kırklareli Merkez'de premium kahve, imza içecekler ve lüks atmosfer. Stella Cafe & Lounge menüsünü keşfedin." },
+      { name: "author", content: "Stella Cafe & Lounge" },
+      { property: "og:title", content: "Stella Cafe & Lounge" },
+      { property: "og:description", content: "Kırklareli'nin en seçkin cafe ve lounge deneyimi." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       {

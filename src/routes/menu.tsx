@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { categories, type Category, type Item } from "@/lib/menu-data";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { categories, type Item } from "@/lib/menu-data";
 import { useLanguage } from "@/lib/i18n";
+import { Navbar } from "@/components/Navbar";
 import {
   ArrowLeftIcon,
   CocktailIcon,
@@ -13,32 +13,71 @@ import {
   ShishaIcon,
 } from "@/components/Icons";
 import { Drawer, DrawerContent, DrawerTrigger, DrawerClose } from "@/components/ui/drawer";
-import { Instagram, MapPin, X } from "lucide-react";
+import { X } from "lucide-react";
+
+// Asset images for category card backgrounds
+import c1Img from "@/assets/c1.jpg";
+import c2Img from "@/assets/c2.jpg";
+import d1Img from "@/assets/d1.jpg";
+import g1Img from "@/assets/g1.jpg";
+import g2Img from "@/assets/g2.jpg";
+import h1Img from "@/assets/h1.jpg";
+import h2Img from "@/assets/h2.jpg";
+import h3Img from "@/assets/h3.jpg";
+import h4Img from "@/assets/h4.jpg";
+import h5Img from "@/assets/h5.jpg";
+import r1Img from "@/assets/r1.jpg";
+import r2Img from "@/assets/r2.jpg";
+import r3Img from "@/assets/r3.jpg";
+import r4Img from "@/assets/r4.jpg";
+import r5Img from "@/assets/r5.jpg";
+import s1Img from "@/assets/s1.jpg";
+import heroImg from "@/assets/hero.jpg";
 
 export const Route = createFileRoute("/menu")({
   component: MenuPage,
   head: () => ({
-    meta: [
-      { title: "Stella Lounge — Menü" },
-    ],
+    meta: [{ title: "Stella Lounge — Menü" }],
   }),
 });
 
+/** Map category id → background image */
+const catBg: Record<string, string> = {
+  snacks:          r1Img,
+  toasts_burgers:  r2Img,
+  pasta_pizzas:    r3Img,
+  main_courses:    r4Img,
+  salads:          r5Img,
+  breakfast_soups: h1Img,
+  desserts:        d1Img,
+  hot_drinks:      h2Img,
+  turkish_coffee:  h3Img,
+  espresso:        h4Img,
+  hot_choco:       h5Img,
+  cold_coffee:     c1Img,
+  frappe:          c2Img,
+  cold_drinks:     g1Img,
+  cocktails:       g2Img,
+  shisha:          s1Img,
+};
+
 const iconFor: Record<string, React.FC<{ className?: string }>> = {
-  snacks: PlateIcon,
-  toasts_burgers: PlateIcon,
-  pasta_pizzas: PlateIcon,
-  main_courses: PlateIcon,
-  salads: PlateIcon,
+  snacks:          PlateIcon,
+  toasts_burgers:  PlateIcon,
+  pasta_pizzas:    PlateIcon,
+  main_courses:    PlateIcon,
+  salads:          PlateIcon,
   breakfast_soups: PlateIcon,
-  desserts: DessertIcon,
-  hot_drinks: CupIcon,
-  turkish_coffee: CupIcon,
-  espresso: CupIcon,
-  hot_choco: CupIcon,
-  cold_coffee: GlassIcon,
-  frappe: GlassIcon,
-  cold_drinks: GlassIcon,
+  desserts:        DessertIcon,
+  hot_drinks:      CupIcon,
+  turkish_coffee:  CupIcon,
+  espresso:        CupIcon,
+  hot_choco:       CupIcon,
+  cold_coffee:     GlassIcon,
+  frappe:          GlassIcon,
+  cold_drinks:     GlassIcon,
+  cocktails:       CocktailIcon,
+  shisha:          ShishaIcon,
 };
 
 function MenuPage() {
@@ -47,177 +86,233 @@ function MenuPage() {
 
   return (
     <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
-      <LanguageSwitcher />
-      {/* Header */}
-      <header className="relative px-6 pt-12 pb-8 text-center flex-shrink-0">
-        <Link
-          to="/"
-          className="absolute left-5 top-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          <span className="sr-only sm:not-sr-only">Geri</span>
-        </Link>
+      <Navbar />
 
-        <div className="flex flex-col items-center gap-2 animate-fade-up">
-          <h1 className="font-sans text-3xl sm:text-4xl font-bold tracking-tight text-foreground mt-4">
-            Stella Menu
-          </h1>
-          <div className="h-px w-12 bg-primary/50 mt-2" />
-        </div>
-      </header>
+      {!activeCatId ? (
+        /* ══════════════════════════════════════════
+            CATEGORIES GRID
+        ══════════════════════════════════════════ */
+        <div className="flex-1 flex flex-col pt-20">
+          {/* Page header */}
+          <header className="px-5 sm:px-8 pt-10 pb-8 text-center animate-fade-up">
+            <span className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/65">
+              Stella
+            </span>
+            <h1 className="font-display text-5xl sm:text-6xl font-light text-white mt-1">
+              Menü
+            </h1>
+            <div className="h-px w-10 bg-primary/40 mx-auto mt-4" />
+          </header>
 
-      {/* Main Content Area */}
-      <div className="flex-1 pb-24">
-        {!activeCatId ? (
-          /* Categories Grid View */
-          <section className="mx-auto max-w-4xl px-4 py-4 animate-fade-up">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {/* Category grid */}
+          <section className="mx-auto w-full max-w-5xl px-4 sm:px-6 pb-24 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
               {categories.map((cat, i) => {
                 const Icon = iconFor[cat.id] ?? PlateIcon;
+                const bg   = catBg[cat.id] ?? heroImg;
+                const title = cat.title?.[language] || cat.title?.["TR"];
+
                 return (
                   <button
                     key={cat.id}
                     onClick={() => setActiveCatId(cat.id)}
-                    className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl bg-card border border-border/50 shadow-sm transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(212,175,55,0.15)] hover:border-primary/40 overflow-hidden"
-                    style={{ animationDelay: `${i * 0.05}s` }}
+                    className="group relative aspect-[3/4] overflow-hidden rounded-xl focus:outline-none"
+                    style={{ animationDelay: `${i * 0.04}s` }}
+                    aria-label={title}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary transition-colors duration-500 z-10">
-                      <Icon className="h-7 w-7 text-primary group-hover:text-black transition-colors" />
+                    {/* Background image */}
+                    <img
+                      src={bg}
+                      alt={title}
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10 transition-opacity duration-500 group-hover:from-black/75" />
+
+                    {/* Gold border on hover */}
+                    <div className="absolute inset-0 rounded-xl border border-transparent group-hover:border-primary/50 transition-colors duration-500" />
+
+                    {/* Top-left icon */}
+                    <div className="absolute top-3.5 left-3.5 h-8 w-8 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center group-hover:border-primary/40 transition-colors duration-500">
+                      <Icon className="h-4 w-4 text-white/70 group-hover:text-primary transition-colors duration-500" />
                     </div>
-                    <span className="font-sans text-sm font-bold tracking-wide text-center z-10">
-                      {cat.title?.[language] || cat.title?.["TR"]}
-                    </span>
+
+                    {/* Bottom label */}
+                    <div className="absolute bottom-0 left-0 right-0 p-4">
+                      <h2 className="font-display text-lg sm:text-xl text-white font-light leading-tight line-clamp-2">
+                        {title}
+                      </h2>
+                      {cat.subtitle?.[language] && (
+                        <p className="font-sans text-[10px] tracking-wider text-white/50 mt-1 line-clamp-1">
+                          {cat.subtitle?.[language] || cat.subtitle?.["TR"]}
+                        </p>
+                      )}
+                    </div>
                   </button>
                 );
               })}
             </div>
           </section>
-        ) : (
-          /* Horizontal Tabs & Product List View */
-          <div className="animate-fade-up">
-            <div className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border/50 py-3 px-4 shadow-sm">
-              <div className="flex items-center gap-4 max-w-2xl mx-auto">
-                <button 
-                  onClick={() => setActiveCatId(null)}
-                  className="flex items-center justify-center h-10 w-10 shrink-0 rounded-full bg-card border border-border hover:border-primary/50 text-foreground transition-all"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" />
-                </button>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                  {categories.map((cat) => {
-                    const isActive = activeCatId === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        onClick={() => setActiveCatId(cat.id)}
-                        className={`flex-shrink-0 px-4 py-2 rounded-lg transition-all duration-300 border text-sm font-semibold tracking-wide ${
-                          isActive 
-                            ? "bg-primary text-black border-primary shadow-[0_0_10px_rgba(212,175,55,0.3)]" 
-                            : "bg-card text-muted-foreground border-transparent hover:text-foreground"
-                        }`}
-                      >
-                        {cat.title?.[language] || cat.title?.["TR"]}
-                      </button>
-                    );
-                  })}
-                </div>
+        </div>
+      ) : (
+        /* ══════════════════════════════════════════
+            PRODUCTS LIST
+        ══════════════════════════════════════════ */
+        <div className="flex-1 flex flex-col pt-16 animate-fade-up">
+          {/* Sticky category tab bar */}
+          <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-xl border-b border-white/[0.06] shadow-sm">
+            <div className="flex items-center gap-3 max-w-2xl mx-auto px-4 py-3">
+              {/* Back button */}
+              <button
+                onClick={() => setActiveCatId(null)}
+                className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-card border border-border hover:border-primary/40 text-muted-foreground hover:text-primary transition-all duration-300"
+                aria-label="Geri"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+              </button>
+
+              {/* Scrollable tab pills */}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
+                {categories.map((cat) => {
+                  const active = activeCatId === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCatId(cat.id)}
+                      className={`flex-shrink-0 px-4 py-1.5 rounded-full transition-all duration-300 border text-[11px] font-semibold tracking-wide ${
+                        active
+                          ? "bg-primary text-black border-primary shadow-[0_0_12px_rgba(212,175,55,0.35)]"
+                          : "bg-card text-muted-foreground border-border/50 hover:text-foreground hover:border-border"
+                      }`}
+                    >
+                      {cat.title?.[language] || cat.title?.["TR"]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            <section className="mx-auto max-w-2xl px-4 py-8">
-              <div className="mb-8 text-center animate-fade-up">
-                <h2 className="text-2xl font-bold tracking-tight text-primary">
-                  {categories.find((c) => c.id === activeCatId)?.title?.[language] || categories.find((c) => c.id === activeCatId)?.title?.["TR"]}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {categories.find((c) => c.id === activeCatId)?.subtitle?.[language] || categories.find((c) => c.id === activeCatId)?.subtitle?.["TR"]}
-                </p>
-              </div>
-
-              <ul className="grid gap-4">
-                {categories
-                  .find((c) => c.id === activeCatId)
-                  ?.items.map((item, i) => (
-                    <ProductCard
-                      key={`${activeCatId}-${i}`}
-                      item={item}
-                      delay={i * 0.05}
-                      language={language}
-                    />
-                  ))}
-              </ul>
-            </section>
           </div>
-        )}
-      </div>
+
+          {/* Category title */}
+          <div className="text-center py-8 px-4 animate-fade-up">
+            <h2 className="font-display text-3xl sm:text-4xl font-light text-white">
+              {categories.find((c) => c.id === activeCatId)?.title?.[language] ||
+               categories.find((c) => c.id === activeCatId)?.title?.["TR"]}
+            </h2>
+            <p className="font-sans text-xs text-muted-foreground/70 mt-2 tracking-wider">
+              {categories.find((c) => c.id === activeCatId)?.subtitle?.[language] ||
+               categories.find((c) => c.id === activeCatId)?.subtitle?.["TR"]}
+            </p>
+            <div className="h-px w-8 bg-primary/35 mx-auto mt-4" />
+          </div>
+
+          {/* Products */}
+          <section className="mx-auto w-full max-w-2xl px-4 pb-24">
+            <ul className="grid gap-3">
+              {categories
+                .find((c) => c.id === activeCatId)
+                ?.items.map((item, i) => (
+                  <ProductCard
+                    key={`${activeCatId}-${i}`}
+                    item={item}
+                    delay={i * 0.04}
+                    language={language}
+                  />
+                ))}
+            </ul>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
 
 function ProductCard({ item, delay, language }: { item: Item; delay: number; language: string }) {
+  const name = item.name[language] || item.name["TR"];
+  const desc = item.desc[language] || item.desc["TR"];
+
   return (
     <Drawer>
       <DrawerTrigger asChild>
         <li
-          className="group relative flex gap-4 p-3 rounded-2xl bg-card border border-border/50 shadow-sm cursor-pointer hover:border-primary/30 hover:shadow-md transition-all duration-300 animate-fade-up"
+          className="group relative flex gap-3 p-3 rounded-xl bg-card border border-border/40 cursor-pointer hover:border-primary/25 hover:bg-card/80 transition-all duration-300 animate-fade-up"
           style={{ animationDelay: `${delay}s` }}
+          role="button"
+          tabIndex={0}
         >
-          <div className="relative h-24 w-24 sm:h-28 sm:w-28 shrink-0 overflow-hidden rounded-xl bg-muted">
+          {/* Thumbnail */}
+          <div className="relative h-[88px] w-[88px] sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
             <img
               src={item.img}
-              alt={item.name[language] || item.name["TR"]}
+              alt={name}
               loading="lazy"
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
             />
+            {/* Subtle gold overlay on hover */}
+            <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500" />
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col justify-center py-1 pr-2">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="font-sans text-base sm:text-lg font-bold text-foreground line-clamp-2 leading-tight">
-                {item.name[language] || item.name["TR"]}
+          {/* Info */}
+          <div className="flex min-w-0 flex-1 flex-col justify-center py-1 pr-1">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h3 className="font-sans text-sm sm:text-[15px] font-semibold text-foreground leading-snug line-clamp-2">
+                {name}
               </h3>
-              <span className="font-sans text-sm font-bold tracking-wide text-primary whitespace-nowrap mt-0.5">
+              <span className="font-sans text-sm font-bold text-primary whitespace-nowrap mt-px shrink-0">
                 {item.price}
               </span>
             </div>
-            <div className="my-2 h-px w-full bg-border" />
-            <p className="font-sans text-xs sm:text-[13px] leading-relaxed text-muted-foreground line-clamp-2">
-              {item.desc[language] || item.desc["TR"]}
+            <div className="h-px w-full bg-border/50 mb-2" />
+            <p className="font-sans text-xs text-muted-foreground leading-relaxed line-clamp-2">
+              {desc}
             </p>
           </div>
         </li>
       </DrawerTrigger>
-      <DrawerContent className="bg-card border-border/50 text-foreground outline-none">
+
+      {/* ── Drawer detail panel ── */}
+      <DrawerContent className="bg-card border-border/40 text-foreground outline-none">
         <div className="mx-auto w-full max-w-md pb-8">
-          <div className="relative w-full aspect-square max-h-[40vh] overflow-hidden rounded-t-[10px]">
-            <img 
-              src={item.img} 
-              alt={item.name[language] || item.name["TR"]} 
-              className="w-full h-full object-cover" 
+          {/* Hero image */}
+          <div className="relative w-full overflow-hidden rounded-t-[10px]" style={{ height: "min(42vh, 280px)" }}>
+            <img
+              src={item.img}
+              alt={name}
+              className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-            <DrawerClose className="absolute top-4 right-4 h-8 w-8 flex items-center justify-center rounded-full bg-black/50 backdrop-blur text-white hover:bg-black/80 transition-colors">
-              <X className="h-5 w-5" />
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+            {/* Close */}
+            <DrawerClose className="absolute top-3.5 right-3.5 h-8 w-8 flex items-center justify-center rounded-full bg-black/50 backdrop-blur text-white hover:bg-black/75 transition-colors">
+              <X className="h-4 w-4" />
             </DrawerClose>
           </div>
-          <div className="px-6 pt-4 pb-2">
-            <div className="flex justify-between items-start gap-4 mb-4">
-              <h2 className="text-2xl font-bold tracking-tight">
-                {item.name[language] || item.name["TR"]}
+
+          {/* Content */}
+          <div className="px-6 pt-5">
+            {/* Gold accent line */}
+            <div className="h-px w-8 bg-primary/60 mb-4" />
+
+            <div className="flex justify-between items-start gap-4 mb-3">
+              <h2 className="font-display text-2xl sm:text-3xl font-light text-white leading-tight">
+                {name}
               </h2>
-              <span className="text-xl font-bold text-primary whitespace-nowrap">
+              <span className="font-sans text-xl font-bold text-primary whitespace-nowrap mt-1 shrink-0">
                 {item.price}
               </span>
             </div>
-            <p className="text-base text-muted-foreground leading-relaxed">
-              {item.desc[language] || item.desc["TR"]}
+
+            <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+              {desc}
             </p>
           </div>
-          <div className="px-6 mt-6">
-             <DrawerClose className="w-full py-4 rounded-xl bg-primary text-black font-bold uppercase tracking-wider text-sm shadow-[0_0_15px_rgba(212,175,55,0.2)] hover:shadow-[0_0_25px_rgba(212,175,55,0.4)] transition-all">
-                Kapat
-             </DrawerClose>
+
+          {/* Close action */}
+          <div className="px-6 mt-7">
+            <DrawerClose className="w-full py-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary font-sans font-bold uppercase tracking-[0.25em] text-[11px] hover:bg-primary hover:text-black transition-all duration-300">
+              Kapat
+            </DrawerClose>
           </div>
         </div>
       </DrawerContent>
