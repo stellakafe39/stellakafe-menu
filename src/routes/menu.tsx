@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useTransition, memo } from "react";
 import { categories, type Item } from "@/lib/menu-data";
 import { useLanguage } from "@/lib/i18n";
 import { Navbar } from "@/components/Navbar";
@@ -82,7 +82,12 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
 
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const { t, language } = useLanguage();
+
+  const handleSetCat = (id: string | null) => {
+    startTransition(() => setActiveCatId(id));
+  };
 
   return (
     <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
@@ -115,7 +120,7 @@ function MenuPage() {
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setActiveCatId(cat.id)}
+                    onClick={() => handleSetCat(cat.id)}
                     className="group relative aspect-[3/4] overflow-hidden rounded-xl focus:outline-none"
                     style={{ animationDelay: `${i * 0.04}s` }}
                     aria-label={title}
@@ -166,7 +171,7 @@ function MenuPage() {
             <div className="flex items-center gap-3 max-w-2xl mx-auto px-4 py-3">
               {/* Back button */}
               <button
-                onClick={() => setActiveCatId(null)}
+                onClick={() => handleSetCat(null)}
                 className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-card border border-border hover:border-primary/40 text-muted-foreground hover:text-primary transition-all duration-300"
                 aria-label="Geri"
               >
@@ -180,7 +185,7 @@ function MenuPage() {
                   return (
                     <button
                       key={cat.id}
-                      onClick={() => setActiveCatId(cat.id)}
+                      onClick={() => handleSetCat(cat.id)}
                       className={`flex-shrink-0 px-4 py-1.5 rounded-full transition-all duration-300 border text-[11px] font-semibold tracking-wide ${
                         active
                           ? "bg-primary text-black border-primary shadow-[0_0_12px_rgba(212,175,55,0.35)]"
@@ -209,7 +214,7 @@ function MenuPage() {
           </div>
 
           {/* Products */}
-          <section className="mx-auto w-full max-w-2xl px-4 pb-24">
+          <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-24 animate-cat-in">
             <ul className="grid gap-3">
               {categories
                 .find((c) => c.id === activeCatId)
@@ -229,7 +234,7 @@ function MenuPage() {
   );
 }
 
-function ProductCard({ item, delay, language }: { item: Item; delay: number; language: string }) {
+const ProductCard = memo(function ProductCard({ item, delay, language }: { item: Item; delay: number; language: string }) {
   const name = item.name[language] || item.name["TR"];
   const desc = item.desc[language] || item.desc["TR"];
 
@@ -248,6 +253,7 @@ function ProductCard({ item, delay, language }: { item: Item; delay: number; lan
               src={item.img}
               alt={name}
               loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
             />
             {/* Subtle gold overlay on hover */}
@@ -318,4 +324,4 @@ function ProductCard({ item, delay, language }: { item: Item; delay: number; lan
       </DrawerContent>
     </Drawer>
   );
-}
+});

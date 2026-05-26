@@ -43,6 +43,8 @@ function Landing() {
             alt="Stella Cafe & Lounge"
             className="h-full w-full object-cover"
             style={{ transform: "scale(1.04)" }}
+            fetchPriority="high"
+            decoding="async"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/40 to-background" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/20 via-transparent to-background/20" />
@@ -400,6 +402,27 @@ function Landing() {
 
             {/* Bottom gold line */}
             <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+          </div>
+
+          {/* ── Google Maps embed ── */}
+          <div
+            className="mt-4 overflow-hidden rounded-2xl border border-white/[0.07] animate-fade-up"
+            style={{ animationDelay: "0.22s", height: "280px" }}
+          >
+            <iframe
+              title="Stella Cafe & Lounge — Harita"
+              src="https://www.google.com/maps/embed?pb=!4m5!3m4!1s0x40a753fa146db7eb:0x3e8fcec4cb9a60a5!8m2!3d41.7351!4d27.2201"
+              width="100%"
+              height="100%"
+              style={{
+                border: 0,
+                filter: "grayscale(25%) brightness(0.82) contrast(1.1) saturate(0.8)",
+                display: "block",
+              }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
         </div>
       </section>

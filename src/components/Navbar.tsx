@@ -36,6 +36,7 @@ export function Navbar() {
         <div className="hidden sm:flex items-center gap-3">
           <Link
             to="/"
+            preload="intent"
             className="font-sans text-[10px] font-medium tracking-[0.25em] uppercase text-muted-foreground hover:text-primary transition-colors duration-300 px-3 py-1"
           >
             Ana Sayfa
@@ -43,6 +44,7 @@ export function Navbar() {
           <span className="text-border text-xs">·</span>
           <Link
             to="/menu"
+            preload="intent"
             className="font-sans text-[10px] font-medium tracking-[0.25em] uppercase text-muted-foreground hover:text-primary transition-colors duration-300 px-3 py-1"
           >
             Menü
