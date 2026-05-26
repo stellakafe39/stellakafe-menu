@@ -3,6 +3,10 @@ import { useLanguage } from "@/lib/i18n";
 import { Instagram, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 
+const MAPS_URL =
+  "https://www.google.com/maps/place/Stella+Cafe+%26+Lounge/@41.7351,27.2201,17z";
+const INSTAGRAM_URL = "https://www.instagram.com/stella_cafe_lounge/";
+
 export function Navbar() {
   const { language, setLanguage } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
@@ -17,19 +21,22 @@ export function Navbar() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "bg-background/85 backdrop-blur-2xl border-b border-white/[0.06] shadow-[0_1px_32px_rgba(0,0,0,0.6)]"
+          ? "bg-background/88 backdrop-blur-2xl border-b border-white/[0.06] shadow-[0_1px_32px_rgba(0,0,0,0.6)]"
           : "bg-gradient-to-b from-black/55 to-transparent"
       }`}
     >
       <div className="mx-auto max-w-7xl px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
         {/* ─── Logo ─── */}
-        <Link to="/" className="flex flex-col items-start leading-none group shrink-0">
-          <span className="font-display text-[1.45rem] tracking-[0.18em] text-white group-hover:text-primary transition-colors duration-300">
-            Stella
-          </span>
-          <span className="font-sans text-[7px] tracking-[0.55em] text-primary/75 uppercase -mt-0.5">
-            Cafe &amp; Lounge
-          </span>
+        <Link to="/" preload="intent" className="shrink-0 group" aria-label="Stella Cafe & Lounge — Ana Sayfa">
+          <img
+            src="/stella-logo.png"
+            alt="Stella Cafe & Lounge"
+            className="h-9 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity duration-300"
+            width="120"
+            height="36"
+            loading="eager"
+            decoding="async"
+          />
         </Link>
 
         {/* ─── Center nav (desktop) ─── */}
@@ -75,7 +82,7 @@ export function Navbar() {
           {/* Social icons */}
           <div className="flex items-center gap-3">
             <a
-              href="https://www.instagram.com/stella_cafe_lounge/"
+              href={INSTAGRAM_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-primary transition-colors duration-300"
@@ -84,11 +91,11 @@ export function Navbar() {
               <Instagram className="h-[15px] w-[15px]" />
             </a>
             <a
-              href="https://share.google/3V6S6Y7FJLwnE8zn6"
+              href={MAPS_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-primary transition-colors duration-300"
-              aria-label="Haritada Gör"
+              aria-label="Google Maps'te Gör"
             >
               <MapPin className="h-[15px] w-[15px]" />
             </a>

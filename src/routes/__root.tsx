@@ -11,21 +11,26 @@ import {
 import { LanguageProvider } from "@/lib/i18n";
 import appCss from "../styles.css?url";
 
+const SITE_URL = "https://stella-lounge-sooty.vercel.app";
+const SITE_NAME = "Stella Cafe & Lounge";
+const SITE_DESC =
+  "Kırklareli Merkez'in en seçkin cafe ve lounge deneyimi. Premium kahve, imza içecekler, gurme lezzetler ve lüks atmosfer.";
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <h1 className="font-display text-7xl font-light text-primary">404</h1>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Sayfa bulunamadı</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+          Aradığınız sayfa mevcut değil veya taşınmış olabilir.
         </p>
         <div className="mt-6">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-black transition-colors hover:bg-primary/90"
           >
-            Go home
+            Ana Sayfaya Dön
           </Link>
         </div>
       </div>
@@ -40,27 +45,24 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+        <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">
+          Sayfa yüklenemedi
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Bir hata oluştu. Lütfen sayfayı yenileyin.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            onClick={() => { router.invalidate(); reset(); }}
+            className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-black transition-colors hover:bg-primary/90"
           >
-            Try again
+            Tekrar Dene
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-full border border-border bg-background px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-card"
           >
-            Go home
+            Ana Sayfa
           </a>
         </div>
       </div>
@@ -73,18 +75,83 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Stella Cafe & Lounge — Kırklareli" },
-      { name: "description", content: "Kırklareli Merkez'de premium kahve, imza içecekler ve lüks atmosfer. Stella Cafe & Lounge menüsünü keşfedin." },
-      { name: "author", content: "Stella Cafe & Lounge" },
-      { property: "og:title", content: "Stella Cafe & Lounge" },
-      { property: "og:description", content: "Kırklareli'nin en seçkin cafe ve lounge deneyimi." },
+      { title: SITE_NAME },
+      { name: "description", content: SITE_DESC },
+      { name: "author", content: SITE_NAME },
+      { name: "theme-color", content: "#0a0a0a" },
+      { name: "robots", content: "index, follow" },
+      { name: "googlebot", content: "index, follow" },
+      // Open Graph
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:title", content: SITE_NAME },
+      { property: "og:description", content: SITE_DESC },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:image", content: `${SITE_URL}/stella-logo.png` },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:locale", content: "tr_TR" },
+      // Twitter Card
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: SITE_NAME },
+      { name: "twitter:description", content: SITE_DESC },
+      { name: "twitter:image", content: `${SITE_URL}/stella-logo.png` },
+      // Geo
+      { name: "geo.region", content: "TR-39" },
+      { name: "geo.placename", content: "Kırklareli" },
+      { name: "geo.position", content: "41.7351;27.2201" },
+      { name: "ICBM", content: "41.7351, 27.2201" },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "canonical", href: SITE_URL },
+      { rel: "icon", href: "/stella-logo.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/stella-logo.png" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+    ],
+    scripts: [
       {
-        rel: "stylesheet",
-        href: appCss,
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Restaurant",
+          name: SITE_NAME,
+          image: `${SITE_URL}/stella-logo.png`,
+          url: SITE_URL,
+          telephone: "+90 555 000 0000",
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: "Cumhuriyet Meydanı, No: 1",
+            addressLocality: "Kırklareli Merkez",
+            addressRegion: "Kırklareli",
+            postalCode: "39000",
+            addressCountry: "TR",
+          },
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: "41.7351",
+            longitude: "27.2201",
+          },
+          openingHoursSpecification: [
+            {
+              "@type": "OpeningHoursSpecification",
+              dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday"],
+              opens: "09:00",
+              closes: "00:00",
+            },
+            {
+              "@type": "OpeningHoursSpecification",
+              dayOfWeek: ["Friday", "Saturday", "Sunday"],
+              opens: "09:00",
+              closes: "02:00",
+            },
+          ],
+          servesCuisine: ["Turkish", "Italian", "International"],
+          priceRange: "₺₺",
+          hasMenu: `${SITE_URL}/menu`,
+          sameAs: ["https://www.instagram.com/stella_cafe_lounge/"],
+        }),
       },
     ],
   }),
@@ -96,7 +163,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="tr">
       <head>
         <HeadContent />
       </head>

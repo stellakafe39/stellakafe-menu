@@ -3,14 +3,18 @@ import {
   LayoutDashboard,
   UtensilsCrossed,
   Settings,
-  Sparkles,
   Menu as MenuIcon,
   X,
+  LogOut,
+  Eye,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Stella Lounge — Admin" }] }),
+  head: () => ({ meta: [{ title: "Stella Lounge — Admin Panel" }] }),
   component: AdminLayout,
 });
 
@@ -20,27 +24,156 @@ const nav = [
   { to: "/admin/settings", label: "Ayarlar", icon: Settings },
 ];
 
+// ── Login Screen ─────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) {
+      setError("E-posta veya şifre hatalı.");
+      setLoading(false);
+    } else {
+      onLogin(data.session);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm animate-fade-up">
+        <div className="flex flex-col items-center mb-10">
+          <img src="/stella-logo.png" alt="Stella Cafe & Lounge" className="h-14 w-auto object-contain mb-4 opacity-90" loading="eager" />
+          <p className="text-[9px] tracking-[0.5em] uppercase text-muted-foreground">Admin Panel</p>
+        </div>
+
+        <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#0e0e0e] p-8">
+          <h1 className="font-display text-2xl text-white mb-1">Giriş Yap</h1>
+          <p className="text-xs text-muted-foreground mb-7">Devam etmek için kimliğinizi doğrulayın.</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">E-posta</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="w-full bg-black/60 border border-[rgba(212,175,55,0.15)] rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-[#d4af37] transition-colors"
+              />
+            </label>
+
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Şifre</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full bg-black/60 border border-[rgba(212,175,55,0.15)] rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-[#d4af37] transition-colors"
+              />
+            </label>
+
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 bg-[#d4af37] text-black font-bold tracking-[0.2em] text-[11px] uppercase rounded-lg py-3 hover:bg-[#e8cf85] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-5 text-center">
+          <Link to="/" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+            ← Siteye Dön
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DevBanner() {
+  return (
+    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 shrink-0">
+      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+      <span className="text-[11px] text-amber-300">
+        Geliştirme modu — Supabase yapılandırılmamış. Veriler yalnızca bu oturumda kaydedilir.
+      </span>
+    </div>
+  );
+}
+
+// ── Admin Layout ──────────────────────────────────────────────────────────────
 function AdminLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [session, setSession] = useState<any>(null);
+  const [checking, setChecking] = useState(isSupabaseConfigured);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
+      setSession(data.session);
+      setChecking(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: string, s: unknown) => setSession(s),
+    );
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <Loader2 className="h-6 w-6 text-[#d4af37] animate-spin" />
+      </div>
+    );
+  }
+
+  if (isSupabaseConfigured && !session) {
+    return <LoginScreen onLogin={(s) => setSession(s)} />;
+  }
 
   const isActive = (to: string, exact?: boolean) =>
     exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
 
+  const handleSignOut = async () => {
+    if (isSupabaseConfigured) await supabase.auth.signOut();
+    setSession(null);
+  };
+
   return (
     <div className="min-h-screen flex bg-[#0a0a0a] text-foreground">
-      {/* Sidebar */}
+      {/* ── Sidebar ── */}
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 bg-[#070707] border-r border-[rgba(212,175,55,0.12)] flex flex-col`}
+        } lg:translate-x-0 bg-[#070707] border-r border-[rgba(212,175,55,0.10)] flex flex-col`}
       >
-        <div className="h-16 flex items-center gap-2 px-6 border-b border-[rgba(212,175,55,0.12)]">
-          <Sparkles className="h-5 w-5 text-gold" />
-          <span className="font-display text-lg tracking-widest text-gold">STELLA</span>
-          <span className="text-xs text-muted-foreground ml-1">admin</span>
+        <div className="h-16 flex items-center gap-3 px-5 border-b border-[rgba(212,175,55,0.10)]">
+          <img src="/stella-logo.png" alt="Stella" className="h-8 w-auto object-contain" loading="eager" />
+          <span className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground/60">admin</span>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+
+        <nav className="flex-1 p-3 space-y-0.5">
           {nav.map((n) => {
             const active = isActive(n.to, n.exact);
             const Icon = n.icon;
@@ -49,51 +182,73 @@ function AdminLayout() {
                 key={n.to}
                 to={n.to}
                 onClick={() => setOpen(false)}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all ${
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
                   active
-                    ? "bg-[rgba(212,175,55,0.10)] text-gold border border-[rgba(212,175,55,0.25)]"
+                    ? "bg-[rgba(212,175,55,0.10)] text-[#d4af37] border border-[rgba(212,175,55,0.20)]"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/[0.03] border border-transparent"
                 }`}
               >
-                <Icon className={`h-4 w-4 ${active ? "text-gold" : ""}`} />
+                <Icon className={`h-4 w-4 shrink-0 ${active ? "text-[#d4af37]" : ""}`} />
                 <span>{n.label}</span>
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#d4af37]" />}
               </Link>
             );
           })}
         </nav>
-        <div className="p-4 border-t border-[rgba(212,175,55,0.12)] text-[11px] text-muted-foreground">
-          v1.0 · Sadece şirket içi kullanım
+
+        <div className="p-3 border-t border-[rgba(212,175,55,0.10)] space-y-0.5">
+          <Link
+            to="/"
+            target="_blank"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.03] border border-transparent transition-all"
+          >
+            <Eye className="h-4 w-4 shrink-0" />
+            Siteyi Görüntüle
+          </Link>
+          {isSupabaseConfigured && session && (
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-red-400 hover:bg-red-500/5 border border-transparent transition-all"
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              Çıkış Yap
+            </button>
+          )}
+          <p className="text-[10px] text-muted-foreground/35 px-3 pt-1">v1.0 · Şirket içi kullanım</p>
         </div>
       </aside>
 
       {open && (
-        <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setOpen(false)} />
       )}
 
-      {/* Main */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 sticky top-0 z-20 bg-[#0a0a0a]/80 backdrop-blur border-b border-[rgba(212,175,55,0.10)] flex items-center px-4 lg:px-8 gap-3">
+      {/* ── Main ── */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {!isSupabaseConfigured && <DevBanner />}
+
+        <header className="h-16 sticky top-0 z-20 bg-[#0a0a0a]/88 backdrop-blur-xl border-b border-[rgba(212,175,55,0.08)] flex items-center px-4 lg:px-8 gap-3 shrink-0">
           <button
             onClick={() => setOpen((v) => !v)}
-            className="lg:hidden p-2 rounded-md hover:bg-white/5"
-            aria-label="Toggle navigation"
+            className="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
+            aria-label="Menüyü aç"
           >
             {open ? <X className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
           </button>
-          <div className="font-display tracking-widest text-sm text-muted-foreground">
-            STELLA LOUNGE / <span className="text-gold">ADMIN</span>
+          <div className="font-display tracking-widest text-sm text-muted-foreground select-none">
+            STELLA / <span className="text-[#d4af37]">ADMIN</span>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
               Yayında
             </div>
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-gold to-[#7a5b10] flex items-center justify-center text-black text-sm font-semibold">
+            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#d4af37] to-[#7a5b10] flex items-center justify-center text-black text-sm font-bold">
               S
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">
+
+        <main className="flex-1 p-4 lg:p-8 overflow-x-hidden overflow-y-auto">
           <Outlet />
         </main>
       </div>
