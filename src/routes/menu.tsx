@@ -13,6 +13,7 @@ import {
   ShishaIcon,
 } from "@/components/Icons";
 import { Drawer, DrawerContent, DrawerClose } from "@/components/ui/drawer";
+import { Footer } from "@/components/Footer";
 import { X } from "lucide-react";
 
 // Asset images for category card backgrounds
@@ -108,7 +109,7 @@ function MenuPage() {
           </header>
 
           <section
-            className="mx-auto w-full max-w-5xl px-4 sm:px-6 pb-24 animate-fade-up"
+            className="mx-auto w-full max-w-5xl px-4 sm:px-6 pb-8 animate-fade-up"
             style={{ animationDelay: "0.1s" }}
           >
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
@@ -152,13 +153,15 @@ function MenuPage() {
               })}
             </div>
           </section>
+          <Footer />
         </div>
       ) : (
         /* ═══════════════════════ PRODUCTS LIST ═══════════════════════ */
         <div className="flex-1 flex flex-col pt-16">
-          {/* Sticky tab bar */}
-          <div className="sticky top-16 z-30 bg-background/92 backdrop-blur-xl border-b border-white/[0.06]">
-            <div className="flex items-center gap-3 max-w-2xl mx-auto px-4 py-3">
+          {/* Sticky category strip */}
+          <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-white/[0.06]">
+            <div className="flex items-center gap-2.5 max-w-2xl mx-auto px-4 py-2.5">
+              {/* Back button */}
               <button
                 onClick={() => handleSetCat(null)}
                 className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-card border border-border hover:border-primary/40 text-muted-foreground hover:text-primary transition-all duration-300"
@@ -166,24 +169,53 @@ function MenuPage() {
               >
                 <ArrowLeftIcon className="h-4 w-4" />
               </button>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
+
+              {/* Mini image cards */}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
                 {categories.map((cat) => {
                   const active = activeCatId === cat.id;
+                  const bg = catBg[cat.id] ?? heroImg;
+                  const Icon = iconFor[cat.id] ?? PlateIcon;
+                  const title = cat.title?.[language] || cat.title?.["TR"];
                   return (
                     <button
                       key={cat.id}
                       onClick={() => handleSetCat(cat.id)}
-                      className={`flex-shrink-0 px-4 py-1.5 rounded-full transition-all duration-300 border text-[11px] font-semibold tracking-wide ${
+                      aria-label={title}
+                      className={`relative flex-shrink-0 overflow-hidden rounded-lg focus:outline-none transition-all duration-300 ${
                         active
-                          ? "bg-primary text-black border-primary shadow-[0_0_12px_rgba(212,175,55,0.3)]"
-                          : "bg-card text-muted-foreground border-border/50 hover:text-foreground hover:border-border"
+                          ? "ring-1 ring-primary animate-cat-glow opacity-100 scale-105"
+                          : "opacity-40 hover:opacity-70 hover:scale-102"
                       }`}
+                      style={{ width: 54, height: 70 }}
                     >
-                      {cat.title?.[language] || cat.title?.["TR"]}
+                      <img
+                        src={bg}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-end pb-1.5 px-0.5 gap-0.5">
+                        <Icon
+                          className={`h-3 w-3 shrink-0 ${active ? "text-primary" : "text-white/80"}`}
+                        />
+                        <span
+                          className={`text-[7px] font-semibold leading-tight text-center line-clamp-2 ${
+                            active ? "text-primary" : "text-white/80"
+                          }`}
+                        >
+                          {title}
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
+
+              {/* Right fade mask */}
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-background to-transparent" />
             </div>
           </div>
 
@@ -201,7 +233,7 @@ function MenuPage() {
           </div>
 
           {/* Products — key forces remount → animate-cat-in replays */}
-          <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-28 animate-cat-in contain-content">
+          <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-8 animate-cat-in contain-content">
             <ul className="grid gap-2.5">
               {activeCat?.items.map((item, i) => (
                 <ProductCard
@@ -213,6 +245,7 @@ function MenuPage() {
               ))}
             </ul>
           </section>
+          <Footer />
         </div>
       )}
 

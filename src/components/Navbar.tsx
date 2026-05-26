@@ -31,9 +31,9 @@ export function Navbar() {
           <img
             src="/stella-logo.png"
             alt="Stella Cafe & Lounge"
-            className="h-9 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity duration-300"
-            width="120"
-            height="36"
+            className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity duration-300"
+            width="160"
+            height="48"
             loading="eager"
             decoding="async"
           />

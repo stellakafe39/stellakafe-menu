@@ -166,14 +166,18 @@ function AdminLayout() {
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 bg-[#070707] border-r border-[rgba(212,175,55,0.10)] flex flex-col`}
+        } lg:translate-x-0 bg-[#060606] border-r border-[rgba(212,175,55,0.10)] flex flex-col`}
       >
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-[rgba(212,175,55,0.10)]">
-          <img src="/stella-logo.png" alt="Stella" className="h-8 w-auto object-contain" loading="eager" />
-          <span className="text-[10px] tracking-[0.4em] uppercase text-muted-foreground/60">admin</span>
+        {/* Gold accent line */}
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-60" />
+
+        <div className="h-16 flex items-center gap-3 px-5 border-b border-[rgba(212,175,55,0.08)]">
+          <img src="/stella-logo.png" alt="Stella" className="h-10 w-auto object-contain" loading="eager" />
+          <div className="h-4 w-px bg-[rgba(212,175,55,0.25)]" />
+          <span className="font-display text-[11px] tracking-[0.4em] text-[#d4af37]/50 italic">admin</span>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 p-3 pt-4 space-y-0.5">
           {nav.map((n) => {
             const active = isActive(n.to, n.exact);
             const Icon = n.icon;
@@ -182,21 +186,21 @@ function AdminLayout() {
                 key={n.to}
                 to={n.to}
                 onClick={() => setOpen(false)}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
                   active
-                    ? "bg-[rgba(212,175,55,0.10)] text-[#d4af37] border border-[rgba(212,175,55,0.20)]"
+                    ? "bg-gradient-to-r from-[rgba(212,175,55,0.12)] to-transparent text-[#d4af37] border border-[rgba(212,175,55,0.22)]"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/[0.03] border border-transparent"
                 }`}
               >
-                <Icon className={`h-4 w-4 shrink-0 ${active ? "text-[#d4af37]" : ""}`} />
-                <span>{n.label}</span>
-                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#d4af37]" />}
+                <Icon className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-[#d4af37]" : "group-hover:text-foreground"}`} />
+                <span className={active ? "font-medium" : ""}>{n.label}</span>
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_6px_rgba(212,175,55,0.8)]" />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-3 border-t border-[rgba(212,175,55,0.10)] space-y-0.5">
+        <div className="p-3 border-t border-[rgba(212,175,55,0.08)] space-y-0.5">
           <Link
             to="/"
             target="_blank"
@@ -214,7 +218,10 @@ function AdminLayout() {
               Çıkış Yap
             </button>
           )}
-          <p className="text-[10px] text-muted-foreground/35 px-3 pt-1">v1.0 · Şirket içi kullanım</p>
+          <div className="px-3 pt-2 pb-1">
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-[rgba(212,175,55,0.15)] to-transparent mb-2" />
+            <p className="text-[10px] text-muted-foreground/35">v1.0 · Şirket içi kullanım</p>
+          </div>
         </div>
       </aside>
 
@@ -226,7 +233,7 @@ function AdminLayout() {
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {!isSupabaseConfigured && <DevBanner />}
 
-        <header className="h-16 sticky top-0 z-20 bg-[#0a0a0a]/88 backdrop-blur-xl border-b border-[rgba(212,175,55,0.08)] flex items-center px-4 lg:px-8 gap-3 shrink-0">
+        <header className="h-16 sticky top-0 z-20 bg-[#0a0a0a]/95 backdrop-blur-2xl border-b border-[rgba(212,175,55,0.07)] flex items-center px-4 lg:px-8 gap-3 shrink-0">
           <button
             onClick={() => setOpen((v) => !v)}
             className="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
@@ -234,15 +241,16 @@ function AdminLayout() {
           >
             {open ? <X className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
           </button>
-          <div className="font-display tracking-widest text-sm text-muted-foreground select-none">
-            STELLA / <span className="text-[#d4af37]">ADMIN</span>
+          <div className="font-display text-base tracking-[0.25em] text-muted-foreground/60 select-none">
+            Stella <span className="text-[#d4af37]/80">·</span> <span className="text-[#d4af37] font-medium">Admin</span>
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
+          <div className="ml-auto flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 tracking-wider">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
               Yayında
             </div>
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#d4af37] to-[#7a5b10] flex items-center justify-center text-black text-sm font-bold">
+            <div className="h-8 w-px bg-[rgba(212,175,55,0.15)] hidden sm:block" />
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#d4af37] to-[#7a5b10] flex items-center justify-center text-black text-xs font-bold shadow-[0_0_12px_rgba(212,175,55,0.25)]">
               S
             </div>
           </div>

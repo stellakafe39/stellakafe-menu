@@ -8,6 +8,7 @@ import r1Img from "@/assets/r1.jpg";
 import s1Img from "@/assets/s1.jpg";
 import { ArrowRightIcon, StarIcon } from "@/components/Icons";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { useLanguage } from "@/lib/i18n";
 import { MapPin, Clock, Coffee, Wine, ChefHat, Instagram } from "lucide-react";
 
@@ -374,49 +375,7 @@ function Landing() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          FOOTER
-      ══════════════════════════════════════════ */}
-      <footer className="border-t border-white/[0.05] py-10 px-5 sm:px-8">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-5">
-          <div className="flex flex-col items-center sm:items-start">
-            <img
-              src="/stella-logo.png"
-              alt="Stella Cafe & Lounge"
-              className="h-10 w-auto object-contain opacity-65 hover:opacity-90 transition-opacity duration-300"
-              width={120}
-              height={40}
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-
-          <p className="font-sans text-[9px] tracking-[0.35em] text-muted-foreground/50 uppercase">
-            © 2026 Stella Cafe &amp; Lounge. Tüm hakları saklıdır.
-          </p>
-
-          <div className="flex items-center gap-5">
-            <a
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground/50 hover:text-primary transition-colors duration-300"
-              aria-label="Instagram"
-            >
-              <Instagram className="h-4 w-4" />
-            </a>
-            <a
-              href={MAPS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground/50 hover:text-primary transition-colors duration-300"
-              aria-label="Google Maps'te Gör"
-            >
-              <MapPin className="h-4 w-4" />
-            </a>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }

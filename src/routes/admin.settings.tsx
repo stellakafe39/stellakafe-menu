@@ -80,8 +80,9 @@ function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-8 animate-fade-up">
       <div>
-        <h1 className="font-display text-3xl tracking-wide">Ayarlar</h1>
-        <p className="text-sm text-muted-foreground mt-1">İşletme bilgilerini ve tercihlerinizi yönetin.</p>
+        <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-[#d4af37]/60 mb-1">Stella Lounge</p>
+        <h1 className="font-display text-3xl sm:text-4xl tracking-wide font-light">Ayarlar</h1>
+        <p className="text-sm text-muted-foreground mt-1.5">İşletme bilgilerini ve tercihlerinizi yönetin.</p>
       </div>
 
       {!isSupabaseConfigured && (

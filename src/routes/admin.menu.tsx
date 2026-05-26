@@ -173,15 +173,16 @@ function MenuManagement() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl tracking-wide">Menü Yönetimi</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {items.length} ürün · {filtered.length} görüntüleniyor
-            {isSupabaseConfigured && <span className="ml-2 text-emerald-400">● Supabase</span>}
+          <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-[#d4af37]/60 mb-1">Stella Lounge</p>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-wide font-light">Menü Yönetimi</h1>
+          <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
+            <span>{items.length} ürün · {filtered.length} görüntüleniyor</span>
+            {isSupabaseConfigured && <span className="text-emerald-400/80 text-[10px] tracking-wider flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />Supabase</span>}
           </p>
         </div>
         <button
           onClick={openNew}
-          className="inline-flex items-center gap-2 bg-[#d4af37] text-black px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-[#e8cf85] hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] transition-all"
+          className="inline-flex items-center gap-2 bg-[#d4af37] text-black px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#e8cf85] hover:shadow-[0_0_24px_rgba(212,175,55,0.4)] transition-all tracking-wide"
         >
           <Plus className="h-4 w-4" /> Yeni Ürün Ekle
         </button>
