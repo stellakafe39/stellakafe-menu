@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Timer,
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
 
@@ -30,7 +30,7 @@ const nav = [
 ];
 
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 60_000; // 60 saniye kilitlenme
+const LOCKOUT_SECS = 60;
 
 // ── Theme Toggle ──────────────────────────────────────────────────────────────
 function AdminThemeToggle() {
@@ -40,19 +40,18 @@ function AdminThemeToggle() {
     <button
       onClick={toggleTheme}
       aria-label={isLight ? "Karanlık moda geç" : "Aydınlık moda geç"}
-      title={isLight ? "Karanlık mod" : "Aydınlık mod"}
       className={`relative flex items-center h-6 w-11 rounded-full border transition-all duration-500 shrink-0 ${
         isLight
-          ? "border-amber-300/70 bg-amber-50/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]"
-          : "border-white/10 bg-white/[0.07] shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)]"
+          ? "border-amber-300/70 bg-amber-50/80"
+          : "border-white/10 bg-white/[0.07]"
       }`}
     >
-      <Moon className={`absolute left-1.5 h-2.5 w-2.5 transition-all duration-300 ${isLight ? "opacity-0 scale-50" : "opacity-50 scale-100 text-white/70"}`} />
-      <Sun  className={`absolute right-1.5 h-2.5 w-2.5 transition-all duration-300 ${isLight ? "opacity-70 scale-100 text-amber-600" : "opacity-0 scale-50"}`} />
-      <span className={`absolute h-4 w-4 rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+      <Moon className={`absolute left-1.5 h-2.5 w-2.5 transition-all duration-300 ${isLight ? "opacity-0" : "opacity-50 text-white/70"}`} />
+      <Sun  className={`absolute right-1.5 h-2.5 w-2.5 transition-all duration-300 ${isLight ? "opacity-70 text-amber-600" : "opacity-0"}`} />
+      <span className={`absolute h-4 w-4 rounded-full transition-all duration-500 ${
         isLight
-          ? "left-[calc(100%-18px)] bg-amber-400 shadow-[0_0_8px_rgba(212,175,55,0.5),0_1px_3px_rgba(0,0,0,0.2)]"
-          : "left-[2px] bg-[#2c2c2c] shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+          ? "left-[calc(100%-18px)] bg-amber-400 shadow-[0_0_8px_rgba(212,175,55,0.5)]"
+          : "left-[2px] bg-[#2c2c2c]"
       }`} />
     </button>
   );
@@ -65,32 +64,29 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState(0);
-  const [lockedUntil, setLockedUntil] = useState(0);
-  const [tick, setTick] = useState(0);
+  // Lockout: store unlock timestamp in ref to avoid stale closure issues
+  const lockUntilRef = useRef(0);
+  const [remaining, setRemaining] = useState(0);
 
-  // Geri sayım için her saniye güncelle
   useEffect(() => {
-    if (lockedUntil <= 0) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    if (remaining <= 0) return;
+    const id = setInterval(() => {
+      const left = Math.max(0, Math.ceil((lockUntilRef.current - Date.now()) / 1000));
+      setRemaining(left);
+      if (left === 0) {
+        setAttempts(0);
+        setError("");
+      }
+    }, 1000);
     return () => clearInterval(id);
-  }, [lockedUntil]);
+  }, [remaining]);
 
-  const remaining = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
   const locked = remaining > 0;
-
-  // Kilitlenme süresi bitince state temizle
-  useEffect(() => {
-    if (lockedUntil > 0 && remaining === 0) {
-      setLockedUntil(0);
-      setAttempts(0);
-      setError("");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (locked || loading) return;
+    if (locked || loading || !email || !password) return;
+
     setLoading(true);
     setError("");
 
@@ -104,8 +100,10 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
         const next = attempts + 1;
         setAttempts(next);
         if (next >= MAX_ATTEMPTS) {
-          setLockedUntil(Date.now() + LOCKOUT_MS);
-          setError(`Çok fazla hatalı deneme. ${LOCKOUT_MS / 1000} saniye bekleyin.`);
+          const until = Date.now() + LOCKOUT_SECS * 1000;
+          lockUntilRef.current = until;
+          setRemaining(LOCKOUT_SECS);
+          setError(`Çok fazla hatalı deneme. ${LOCKOUT_SECS} saniye bekleyin.`);
         } else {
           const left = MAX_ATTEMPTS - next;
           setError(
@@ -119,27 +117,18 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
         onLogin(data.session);
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? `Bağlantı hatası: ${err.message}`
-          : "Bağlantı kurulamadı. Lütfen tekrar deneyin.",
-      );
+      setError(err instanceof Error ? `Bağlantı hatası: ${err.message}` : "Bağlantı kurulamadı.");
     } finally {
       setLoading(false);
     }
-  }, [email, password, attempts, locked, loading, onLogin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, password, attempts, locked, loading]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-sm animate-fade-up">
-        {/* Logo */}
+      <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-10">
-          <img
-            src="/stella-logo.png"
-            alt="Stella Cafe & Lounge"
-            className="h-16 w-auto object-contain mb-4 opacity-90"
-            loading="eager"
-          />
+          <img src="/stella-logo.png" alt="Stella" className="h-16 w-auto object-contain mb-4 opacity-90" loading="eager" />
           <p className="text-[9px] tracking-[0.5em] uppercase text-muted-foreground">Admin Panel</p>
         </div>
 
@@ -153,10 +142,10 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <label className="block">
-              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
                 E-posta
-              </span>
+              </label>
               <input
                 type="email"
                 value={email}
@@ -168,12 +157,12 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
                 className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/40 disabled:opacity-50"
                 placeholder="admin@example.com"
               />
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
                 Şifre
-              </span>
+              </label>
               <input
                 type="password"
                 value={password}
@@ -183,7 +172,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
                 autoComplete="current-password"
                 className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
               />
-            </label>
+            </div>
 
             {error && (
               <div className="flex items-start gap-2 text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
@@ -240,54 +229,55 @@ function DevBanner() {
 
 // ── Admin Layout ──────────────────────────────────────────────────────────────
 function AdminLayout() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [session, setSession] = useState<any>(null);
+  // If Supabase is not configured, skip auth check entirely
   const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    let cancelled = false;
+    let active = true;
 
-    // 5 saniye içinde cevap gelmezse login ekranını göster
-    const timer = setTimeout(() => {
-      if (!cancelled) setAuthChecked(true);
-    }, 5000);
+    // Fallback: if getSession() hangs longer than 4s, proceed to login screen.
+    // Using requestAnimationFrame loop instead of setTimeout to avoid
+    // microtask-queue starvation (Supabase Promise chains can block macrotasks).
+    const start = Date.now();
+    let rafId: number;
+    function checkTimeout() {
+      if (!active) return;
+      if (Date.now() - start >= 4000) {
+        setAuthChecked(true);
+        return;
+      }
+      rafId = requestAnimationFrame(checkTimeout);
+    }
+    rafId = requestAnimationFrame(checkTimeout);
 
-    supabase.auth
-      .getSession()
-      .then(({ data }: { data: { session: unknown } }) => {
-        if (!cancelled) {
-          clearTimeout(timer);
-          setSession(data.session ?? null);
-          setAuthChecked(true);
-        }
+    // One-shot session check — no persistent subscription.
+    // onAuthStateChange is intentionally omitted: in Supabase JS v2 it can
+    // trigger rapid TOKEN_REFRESHED microtask chains that starve the event loop.
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        cancelAnimationFrame(rafId);
+        setSession(data?.session ?? null);
+        setAuthChecked(true);
       })
       .catch(() => {
-        if (!cancelled) {
-          clearTimeout(timer);
-          setAuthChecked(true);
-        }
+        if (!active) return;
+        cancelAnimationFrame(rafId);
+        setAuthChecked(true);
       });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: string, s: unknown) => {
-      if (!cancelled && (event === "SIGNED_IN" || event === "SIGNED_OUT")) {
-        setSession(s ?? null);
-      }
-    });
-
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
-      subscription.unsubscribe();
+      active = false;
+      cancelAnimationFrame(rafId);
     };
   }, []);
 
-  // Auth kontrol ediliyor
   if (!authChecked) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
@@ -298,7 +288,6 @@ function AdminLayout() {
     );
   }
 
-  // Login ekranı
   if (isSupabaseConfigured && !session) {
     return <LoginScreen onLogin={(s) => setSession(s)} />;
   }
@@ -344,11 +333,9 @@ function AdminLayout() {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent"
                 }`}
               >
-                <Icon className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-primary" : "group-hover:text-foreground"}`} />
+                <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "group-hover:text-foreground"}`} />
                 <span className={active ? "font-medium" : ""}>{n.label}</span>
-                {active && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(212,175,55,0.8)]" />
-                )}
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(212,175,55,0.8)]" />}
               </Link>
             );
           })}
@@ -385,10 +372,7 @@ function AdminLayout() {
       </aside>
 
       {open && (
-        <div
-          className="fixed inset-0 z-30 bg-black/70 lg:hidden"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setOpen(false)} />
       )}
 
       {/* ── Main ── */}
