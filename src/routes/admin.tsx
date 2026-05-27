@@ -162,16 +162,21 @@ function AdminLayout() {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let done = false;
+    // 4 saniye içinde cevap gelmezse login ekranını göster
     const timer = setTimeout(() => {
       if (!done) { done = true; setChecking(false); }
-    }, 6000);
+    }, 4000);
     supabase.auth.getSession()
       .then(({ data }: { data: { session: unknown } }) => {
         if (!done) { done = true; clearTimeout(timer); setSession(data.session); setChecking(false); }
       })
       .catch(() => { if (!done) { done = true; clearTimeout(timer); setChecking(false); } });
+    // Sadece anlamlı auth event'leri dinle — INITIAL_SESSION / TOKEN_REFRESHED gibi
+    // arka plan event'leri state'i bozmamalı
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: string, s: unknown) => setSession(s),
+      (event: string, s: unknown) => {
+        if (event === "SIGNED_IN" || event === "SIGNED_OUT") setSession(s);
+      },
     );
     return () => { clearTimeout(timer); subscription.unsubscribe(); };
   }, []);

@@ -5,8 +5,21 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const isSupabaseConfigured = Boolean(url && key);
 
+// Her Supabase isteğine 8 saniyelik timeout — sonsuz retry döngüsünü önler
+const fetchWithTimeout: typeof fetch = (input, init?) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 8000);
+  return fetch(input as RequestInfo, { ...(init as RequestInit), signal: controller.signal })
+    .finally(() => clearTimeout(id));
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = isSupabaseConfigured ? createClient(url!, key!) : (null as any);
+export const supabase = isSupabaseConfigured
+  ? createClient(url!, key!, {
+      global: { fetch: fetchWithTimeout },
+      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
+    })
+  : (null as any);
 
 export type MenuItemRow = {
   id: string;
