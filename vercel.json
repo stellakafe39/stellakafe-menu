@@ -3,6 +3,7 @@
   "outputDirectory": "dist/spa",
   "framework": null,
   "rewrites": [
+    { "source": "/admin", "destination": "/admin.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

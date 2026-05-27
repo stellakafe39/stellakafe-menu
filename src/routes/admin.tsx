@@ -1,4 +1,3 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   LayoutDashboard, UtensilsCrossed, Settings as Cog,
@@ -10,12 +9,7 @@ import {
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAdminItems, categoryTitle, type AdminItem } from "@/lib/admin-store";
 import { Toggle } from "@/components/admin/Toggle";
-import { useTheme } from "@/lib/theme";
-
-export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Stella Lounge — Admin" }] }),
-  component: AdminRoot,
-});
+import { ThemeProvider, useTheme } from "@/lib/theme";
 
 type AdminView = "dashboard" | "menu" | "settings";
 const MAX_ATTEMPTS = 5;
@@ -138,7 +132,7 @@ function LoginScreen({ onLogin }: { onLogin: (s: unknown) => void }) {
           </form>
         </div>
         <div className="mt-4 flex items-center justify-center gap-4">
-          <Link to="/" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">← Siteye Dön</Link>
+          <a href="/" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">← Siteye Dön</a>
           <span className="text-muted-foreground/30">·</span>
           <AdminThemeToggle />
         </div>
@@ -584,7 +578,7 @@ function SettingsView() {
   );
 }
 
-// ── Authed Admin (rendered only after auth is confirmed) ──────────────────────
+// ── Authed Admin ──────────────────────────────────────────────────────────────
 function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
   const [view, setView] = useState<AdminView>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -598,7 +592,6 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
-      {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 bg-card border-r border-border flex flex-col`}>
         <div className="h-px w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
         <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
@@ -621,9 +614,9 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
           })}
         </nav>
         <div className="p-3 border-t border-border space-y-0.5">
-          <Link to="/" target="_blank" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent transition-all">
+          <a href="/" target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent transition-all">
             <Eye className="h-4 w-4 shrink-0" />Siteyi Görüntüle
-          </Link>
+          </a>
           {isSupabaseConfigured && (
             <button onClick={onSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/5 border border-transparent transition-all">
               <LogOut className="h-4 w-4 shrink-0" />Çıkış Yap
@@ -641,7 +634,6 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
 
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Main */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {!isSupabaseConfigured && (
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 shrink-0">
@@ -676,7 +668,7 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
-// ── Root component registered with TanStack Router ────────────────────────────
+// ── Root: standalone app, no TanStack Router ──────────────────────────────────
 function AdminRoot() {
   const [session, setSession] = useState<unknown>(null);
   const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured);
@@ -709,4 +701,12 @@ function AdminRoot() {
     if (isSupabaseConfigured) try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setSession(null);
   }} />;
+}
+
+export function AdminApp() {
+  return (
+    <ThemeProvider>
+      <AdminRoot />
+    </ThemeProvider>
+  );
 }

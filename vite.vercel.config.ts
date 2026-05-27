@@ -8,7 +8,7 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 // server adapter so Vite produces a standard index.html + assets bundle.
 export default defineConfig({
   plugins: [
-    TanStackRouterVite({ autoCodeSplitting: true }),
+    TanStackRouterVite({ autoCodeSplitting: false }),
     react(),
     tailwindcss(),
     tsconfigPaths(),
@@ -17,7 +17,10 @@ export default defineConfig({
     outDir: "dist/spa",
     emptyOutDir: true,
     rollupOptions: {
-      input: "./index.html",
+      input: {
+        main: "./index.html",
+        admin: "./admin.html",
+      },
     },
   },
   css: {
