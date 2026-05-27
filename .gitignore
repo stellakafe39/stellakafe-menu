@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 *.local
 
+# AI-generated images (large binaries — upload to Cloudinary instead)
+generated-images/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
