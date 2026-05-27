@@ -50,7 +50,7 @@ export function useAdminItems() {
       const abortTimer = setTimeout(() => {
         setItems(seed);
         setLoading(false);
-      }, 10000);
+      }, 5000);
       supabase
         .from("menu_items")
         .select("*")
@@ -85,16 +85,19 @@ export function useAdminItems() {
           setLoading(false);
         });
     } else {
+      // localStorage okurken büyük/bozuk JSON donmaya neden olabilir — güvenli parse
       try {
         const raw = localStorage.getItem(LS_KEY);
-        if (raw) {
+        if (raw && raw.length < 5_000_000) {
           const parsed: AdminItem[] = JSON.parse(raw);
           const imgMap = new Map(seed.map((s) => [s.id, s.img]));
           setItems(parsed.map((p) => ({ ...p, img: p.img || imgMap.get(p.id) || "" })));
         } else {
+          if (raw) localStorage.removeItem(LS_KEY); // bozuk/devasa veriyi temizle
           setItems(seed);
         }
       } catch {
+        localStorage.removeItem(LS_KEY);
         setItems(seed);
       }
       setLoading(false);
