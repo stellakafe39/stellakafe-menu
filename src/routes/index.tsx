@@ -149,7 +149,7 @@ function Landing() {
       {/* ══════════════════════════════════════════
           MARQUEE
       ══════════════════════════════════════════ */}
-      <div className="border-y border-white/[0.06] bg-card/40 py-4 overflow-hidden">
+      <div className="border-y border-border/20 bg-card/40 py-4 overflow-hidden">
         <div className="animate-marquee flex items-center gap-0 whitespace-nowrap" style={{ width: "max-content" }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <span key={i} className="font-sans text-[9px] tracking-[0.4em] uppercase text-primary/50 pr-14">
@@ -166,7 +166,7 @@ function Landing() {
         <div className="max-w-7xl mx-auto">
           <div className="mb-10 sm:mb-14 flex flex-col items-center text-center animate-fade-up">
             <span className="font-sans text-[9px] tracking-[0.45em] uppercase text-primary/65 mb-3">Atmosfer</span>
-            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl text-white font-light leading-tight">
+            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl text-foreground font-light leading-tight">
               Bir Dünya <em>Yaratıyoruz</em>
             </h2>
           </div>
@@ -216,7 +216,7 @@ function Landing() {
       {/* ══════════════════════════════════════════
           EXPERIENCE
       ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-32 px-5 sm:px-8 bg-card/20 border-y border-white/[0.04]">
+      <section className="py-20 sm:py-32 px-5 sm:px-8 bg-card/20 border-y border-border/20">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-14 sm:gap-24 items-center">
           <div className="space-y-8 animate-fade-up">
             <div>
@@ -246,7 +246,7 @@ function Landing() {
                   <div className="h-9 w-9 rounded-lg border border-primary/20 bg-primary/8 flex items-center justify-center">
                     <Icon className="h-4 w-4 text-primary" />
                   </div>
-                  <h4 className="font-sans text-sm font-semibold text-white">{title}</h4>
+                  <h4 className="font-sans text-sm font-semibold text-foreground">{title}</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
                 </div>
               ))}
@@ -255,7 +255,7 @@ function Landing() {
             <Link
               to="/menu"
               preload="intent"
-              className="inline-flex items-center gap-2 text-primary hover:text-white transition-colors duration-300 group text-[11px] font-bold tracking-[0.3em] uppercase"
+              className="inline-flex items-center gap-2 text-primary hover:text-foreground transition-colors duration-300 group text-[11px] font-bold tracking-[0.3em] uppercase"
             >
               <span>Tüm Menüyü İncele</span>
               <ArrowRightIcon className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
@@ -263,7 +263,7 @@ function Landing() {
           </div>
 
           <div className="relative h-[380px] sm:h-[500px] animate-fade-up" style={{ animationDelay: "0.18s" }}>
-            <div className="absolute inset-0 rounded-2xl overflow-hidden border border-white/[0.06]">
+            <div className="absolute inset-0 rounded-2xl overflow-hidden border border-border/25">
               <img
                 src={r1Img}
                 alt="Stella yemek ve içecek"
@@ -292,12 +292,12 @@ function Landing() {
           </div>
 
           <div
-            className="relative rounded-2xl border border-white/[0.07] bg-card/70 overflow-hidden animate-fade-up"
+            className="relative rounded-2xl border border-border/30 bg-card/70 overflow-hidden animate-fade-up"
             style={{ animationDelay: "0.12s" }}
           >
             <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
-            <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.06] p-7 sm:p-10">
+            <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/30 p-7 sm:p-10">
               <div className="pb-7 sm:pb-0 sm:pr-10 space-y-3">
                 <div className="flex items-center gap-2 text-primary mb-5">
                   <MapPin className="h-4 w-4 shrink-0" />
@@ -312,7 +312,7 @@ function Landing() {
                   href={MAPS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-primary hover:text-white transition-colors text-[10px] font-bold tracking-wider uppercase group mt-1"
+                  className="inline-flex items-center gap-1.5 text-primary hover:text-foreground transition-colors text-[10px] font-bold tracking-wider uppercase group mt-1"
                 >
                   Haritada Gör
                   <ArrowRightIcon className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
@@ -330,14 +330,14 @@ function Landing() {
                     <span className="font-medium text-foreground/70 text-xs tracking-wider font-mono shrink-0">09:00 – 00:00</span>
                   </li>
                   <li className="flex justify-between items-baseline gap-4">
-                    <span className="text-white">Cuma – Pazar</span>
+                    <span className="text-foreground">Cuma – Pazar</span>
                     <span className="font-medium text-primary text-xs tracking-wider font-mono shrink-0">09:00 – 02:00</span>
                   </li>
                 </ul>
               </div>
             </div>
 
-            <div className="border-t border-white/[0.06] p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div className="border-t border-border/25 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
               <Link
                 to="/menu"
                 preload="intent"
@@ -354,7 +354,7 @@ function Landing() {
           </div>
 
           <div
-            className="mt-4 overflow-hidden rounded-2xl border border-white/[0.07] animate-fade-up"
+            className="mt-4 overflow-hidden rounded-2xl border border-border/25 animate-fade-up"
             style={{ animationDelay: "0.22s", height: "280px" }}
           >
             <iframe

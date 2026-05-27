@@ -104,7 +104,7 @@ function MenuPage() {
         <div className="flex-1 flex flex-col pt-20">
           <header className="px-5 sm:px-8 pt-10 pb-8 text-center animate-fade-up">
             <span className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/65">Stella</span>
-            <h1 className="font-display text-5xl sm:text-6xl font-light text-white mt-1">Menü</h1>
+            <h1 className="font-display text-5xl sm:text-6xl font-light text-foreground mt-1">Menü</h1>
             <div className="h-px w-10 bg-primary/40 mx-auto mt-4" />
           </header>
 
@@ -159,8 +159,8 @@ function MenuPage() {
         /* ═══════════════════════ PRODUCTS LIST ═══════════════════════ */
         <div className="flex-1 flex flex-col pt-16">
           {/* Sticky category strip */}
-          <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-white/[0.06]">
-            <div className="flex items-center gap-2.5 max-w-2xl mx-auto px-4 py-2.5">
+          <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-border/30">
+            <div className="relative flex items-center gap-2.5 max-w-2xl mx-auto px-4 py-2.5">
               {/* Back button */}
               <button
                 onClick={() => handleSetCat(null)}
@@ -185,7 +185,7 @@ function MenuPage() {
                       className={`relative flex-shrink-0 overflow-hidden rounded-lg focus:outline-none transition-all duration-300 ${
                         active
                           ? "ring-1 ring-primary animate-cat-glow opacity-100 scale-105"
-                          : "opacity-40 hover:opacity-70 hover:scale-102"
+                          : "opacity-40 hover:opacity-70 hover:scale-[1.04]"
                       }`}
                       style={{ width: 54, height: 70 }}
                     >
@@ -221,7 +221,7 @@ function MenuPage() {
 
           {/* Category title */}
           <div className="text-center py-7 px-4">
-            <h2 className="font-display text-3xl sm:text-4xl font-light text-white">
+            <h2 className="font-display text-3xl sm:text-4xl font-light text-foreground">
               {activeCat?.title?.[language] || activeCat?.title?.["TR"]}
             </h2>
             {activeCat?.subtitle?.[language] && (
@@ -272,7 +272,7 @@ function MenuPage() {
               <div className="px-6 pt-5">
                 <div className="h-px w-8 bg-primary/60 mb-4" />
                 <div className="flex justify-between items-start gap-4 mb-3">
-                  <h2 className="font-display text-2xl sm:text-3xl font-light text-white leading-tight">
+                  <h2 className="font-display text-2xl sm:text-3xl font-light text-foreground leading-tight">
                     {selectedItem.name[language] || selectedItem.name["TR"]}
                   </h2>
                   <span className="font-sans text-xl font-bold text-primary whitespace-nowrap mt-1 shrink-0">

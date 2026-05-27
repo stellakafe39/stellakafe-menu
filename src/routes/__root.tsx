@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 
 import { LanguageProvider } from "@/lib/i18n";
+import { ThemeProvider } from "@/lib/theme";
 import appCss from "../styles.css?url";
 
 const SITE_URL = "https://stella-lounge-sooty.vercel.app";
@@ -180,9 +181,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <Outlet />
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <Outlet />
+        </LanguageProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

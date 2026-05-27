@@ -51,6 +51,34 @@
   --primary: #d4af37;
 }
 
+/* ─── Light mode ─── */
+html.light {
+  --background: #f7f3ec;
+  --foreground: #1a1208;
+  --card: #ede6d8;
+  --muted: #e2d9c8;
+  --border: #c8bfa8;
+  --muted-foreground: #7a6e5e;
+  --primary: #b8960c;
+  --gold: #b8960c;
+}
+
+html.light body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Grain lighter in light mode */
+html.light body::after {
+  opacity: 0.012;
+}
+
+/* Light mode — view transitions keep bg coherent */
+html.light ::view-transition-old(root),
+html.light ::view-transition-new(root) {
+  background-color: #f7f3ec;
+}
+
 * {
   border-color: var(--color-border);
 }
