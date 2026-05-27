@@ -12,10 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as MenuRouteImport } from './routes/menu'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as HizmetlerSlugRouteImport } from './routes/hizmetler.$slug'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminMenuRouteImport } from './routes/admin.menu'
 
 const MenuRoute = MenuRouteImport.update({
   id: '/menu',
@@ -32,86 +29,42 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AdminRoute,
-} as any)
 const HizmetlerSlugRoute = HizmetlerSlugRouteImport.update({
   id: '/hizmetler/$slug',
   path: '/hizmetler/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminMenuRoute = AdminMenuRouteImport.update({
-  id: '/menu',
-  path: '/menu',
-  getParentRoute: () => AdminRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/menu': typeof MenuRoute
-  '/admin/menu': typeof AdminMenuRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/hizmetler/$slug': typeof HizmetlerSlugRoute
-  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/menu': typeof MenuRoute
-  '/admin/menu': typeof AdminMenuRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/hizmetler/$slug': typeof HizmetlerSlugRoute
-  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/menu': typeof MenuRoute
-  '/admin/menu': typeof AdminMenuRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/hizmetler/$slug': typeof HizmetlerSlugRoute
-  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/admin'
-    | '/menu'
-    | '/admin/menu'
-    | '/admin/settings'
-    | '/hizmetler/$slug'
-    | '/admin/'
+  fullPaths: '/' | '/admin' | '/menu' | '/hizmetler/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/menu'
-    | '/admin/menu'
-    | '/admin/settings'
-    | '/hizmetler/$slug'
-    | '/admin'
-  id:
-    | '__root__'
-    | '/'
-    | '/admin'
-    | '/menu'
-    | '/admin/menu'
-    | '/admin/settings'
-    | '/hizmetler/$slug'
-    | '/admin/'
+  to: '/' | '/admin' | '/menu' | '/hizmetler/$slug'
+  id: '__root__' | '/' | '/admin' | '/menu' | '/hizmetler/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRouteWithChildren
+  AdminRoute: typeof AdminRoute
   MenuRoute: typeof MenuRoute
   HizmetlerSlugRoute: typeof HizmetlerSlugRoute
 }
@@ -139,13 +92,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/': {
-      id: '/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/hizmetler/$slug': {
       id: '/hizmetler/$slug'
       path: '/hizmetler/$slug'
@@ -153,40 +99,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HizmetlerSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/menu': {
-      id: '/admin/menu'
-      path: '/menu'
-      fullPath: '/admin/menu'
-      preLoaderRoute: typeof AdminMenuRouteImport
-      parentRoute: typeof AdminRoute
-    }
   }
 }
 
-interface AdminRouteChildren {
-  AdminMenuRoute: typeof AdminMenuRoute
-  AdminSettingsRoute: typeof AdminSettingsRoute
-  AdminIndexRoute: typeof AdminIndexRoute
-}
-
-const AdminRouteChildren: AdminRouteChildren = {
-  AdminMenuRoute: AdminMenuRoute,
-  AdminSettingsRoute: AdminSettingsRoute,
-  AdminIndexRoute: AdminIndexRoute,
-}
-
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRouteWithChildren,
+  AdminRoute: AdminRoute,
   MenuRoute: MenuRoute,
   HizmetlerSlugRoute: HizmetlerSlugRoute,
 }

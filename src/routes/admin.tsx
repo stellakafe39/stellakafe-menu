@@ -1,70 +1,74 @@
-import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
-  LayoutDashboard,
-  UtensilsCrossed,
-  Settings,
-  Menu as MenuIcon,
-  X,
-  LogOut,
-  Eye,
-  AlertTriangle,
-  Loader2,
-  Sun,
-  Moon,
-  ShieldCheck,
-  Timer,
+  LayoutDashboard, UtensilsCrossed, Settings as Cog,
+  Menu as MenuIcon, X, LogOut, Eye, AlertTriangle, Loader2,
+  Sun, Moon, ShieldCheck, Timer, Plus, Pencil, Trash2, Search,
+  UploadCloud, Image as ImageIcon, Link2, Cloud, Save, CheckCircle2,
+  Package, AlertCircle, TrendingUp, ArrowRight, Database,
 } from "lucide-react";
-import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { useAdminItems, categoryTitle, type AdminItem } from "@/lib/admin-store";
+import { Toggle } from "@/components/admin/Toggle";
 import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Stella Lounge — Admin Panel" }] }),
-  component: AdminLayout,
+  head: () => ({ meta: [{ title: "Stella Lounge — Admin" }] }),
+  component: AdminRoot,
 });
 
-const nav = [
-  { to: "/admin", label: "Kontrol Paneli", icon: LayoutDashboard, exact: true },
-  { to: "/admin/menu", label: "Menü Yönetimi", icon: UtensilsCrossed },
-  { to: "/admin/settings", label: "Ayarlar", icon: Settings },
-];
-
+type AdminView = "dashboard" | "menu" | "settings";
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECS = 60;
+
+// ── Cloudinary ────────────────────────────────────────────────────────────────
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string | undefined;
+const isCloudinaryConfigured = Boolean(CLOUD_NAME && UPLOAD_PRESET);
+
+async function uploadImage(file: File): Promise<string> {
+  if (!isCloudinaryConfigured) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsDataURL(file);
+    });
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("upload_preset", UPLOAD_PRESET!);
+  fd.append("folder", "stella-menu");
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: fd });
+  if (!res.ok) throw new Error("Görsel yüklenemedi");
+  const data = await res.json() as { secure_url: string };
+  return data.secure_url;
+}
 
 // ── Theme Toggle ──────────────────────────────────────────────────────────────
 function AdminThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === "light";
   return (
-    <button
-      onClick={toggleTheme}
-      aria-label={isLight ? "Karanlık moda geç" : "Aydınlık moda geç"}
+    <button onClick={toggleTheme} aria-label="Temayı değiştir"
       className={`relative flex items-center h-6 w-11 rounded-full border transition-all duration-500 shrink-0 ${
-        isLight
-          ? "border-amber-300/70 bg-amber-50/80"
-          : "border-white/10 bg-white/[0.07]"
-      }`}
-    >
-      <Moon className={`absolute left-1.5 h-2.5 w-2.5 transition-all duration-300 ${isLight ? "opacity-0" : "opacity-50 text-white/70"}`} />
-      <Sun  className={`absolute right-1.5 h-2.5 w-2.5 transition-all duration-300 ${isLight ? "opacity-70 text-amber-600" : "opacity-0"}`} />
+        isLight ? "border-amber-300/70 bg-amber-50/80" : "border-white/10 bg-white/[0.07]"
+      }`}>
+      <Moon className={`absolute left-1.5 h-2.5 w-2.5 transition-opacity ${isLight ? "opacity-0" : "opacity-50 text-white/70"}`} />
+      <Sun  className={`absolute right-1.5 h-2.5 w-2.5 transition-opacity ${isLight ? "opacity-70 text-amber-600" : "opacity-0"}`} />
       <span className={`absolute h-4 w-4 rounded-full transition-all duration-500 ${
-        isLight
-          ? "left-[calc(100%-18px)] bg-amber-400 shadow-[0_0_8px_rgba(212,175,55,0.5)]"
-          : "left-[2px] bg-[#2c2c2c]"
+        isLight ? "left-[calc(100%-18px)] bg-amber-400" : "left-[2px] bg-[#2c2c2c]"
       }`} />
     </button>
   );
 }
 
 // ── Login Screen ──────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
+function LoginScreen({ onLogin }: { onLogin: (s: unknown) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState(0);
-  // Lockout: store unlock timestamp in ref to avoid stale closure issues
   const lockUntilRef = useRef(0);
   const [remaining, setRemaining] = useState(0);
 
@@ -73,141 +77,68 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
     const id = setInterval(() => {
       const left = Math.max(0, Math.ceil((lockUntilRef.current - Date.now()) / 1000));
       setRemaining(left);
-      if (left === 0) {
-        setAttempts(0);
-        setError("");
-      }
+      if (left === 0) { setAttempts(0); setError(""); }
     }, 1000);
     return () => clearInterval(id);
   }, [remaining]);
 
   const locked = remaining > 0;
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (locked || loading || !email || !password) return;
-
-    setLoading(true);
-    setError("");
-
+    setLoading(true); setError("");
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (authError) {
-        const next = attempts + 1;
-        setAttempts(next);
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (err) {
+        const next = attempts + 1; setAttempts(next);
         if (next >= MAX_ATTEMPTS) {
-          const until = Date.now() + LOCKOUT_SECS * 1000;
-          lockUntilRef.current = until;
+          lockUntilRef.current = Date.now() + LOCKOUT_SECS * 1000;
           setRemaining(LOCKOUT_SECS);
-          setError(`Çok fazla hatalı deneme. ${LOCKOUT_SECS} saniye bekleyin.`);
+          setError(`Çok fazla deneme. ${LOCKOUT_SECS}s bekleyin.`);
         } else {
-          const left = MAX_ATTEMPTS - next;
-          setError(
-            authError.message.toLowerCase().includes("invalid")
-              ? `E-posta veya şifre hatalı. (${left} deneme hakkı kaldı)`
-              : authError.message,
-          );
+          setError(`Hatalı e-posta veya şifre. (${MAX_ATTEMPTS - next} hak)`);
         }
-      } else {
-        setAttempts(0);
-        onLogin(data.session);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? `Bağlantı hatası: ${err.message}` : "Bağlantı kurulamadı.");
-    } finally {
-      setLoading(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email, password, attempts, locked, loading]);
+      } else { onLogin(data.session); }
+    } catch { setError("Bağlantı hatası."); }
+    finally { setLoading(false); }
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-10">
-          <img src="/stella-logo.png" alt="Stella" className="h-16 w-auto object-contain mb-4 opacity-90" loading="eager" />
+          <img src="/stella-logo.png" alt="Stella" className="h-16 w-auto mb-4 opacity-90" loading="eager" />
           <p className="text-[9px] tracking-[0.5em] uppercase text-muted-foreground">Admin Panel</p>
         </div>
-
         <div className="rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/20">
           <div className="flex items-center gap-2.5 mb-6">
-            <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <h1 className="font-display text-xl text-foreground leading-tight">Güvenli Giriş</h1>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Yalnızca yetkili erişim.</p>
-            </div>
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <h1 className="font-display text-xl text-foreground">Güvenli Giriş</h1>
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmit={submit} className="space-y-4" noValidate>
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
-                E-posta
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={locked}
-                autoComplete="email"
-                autoFocus
-                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/40 disabled:opacity-50"
-                placeholder="admin@example.com"
-              />
+              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">E-posta</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                autoFocus autoComplete="email" disabled={locked}
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors disabled:opacity-50" />
             </div>
-
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
-                Şifre
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={locked}
-                autoComplete="current-password"
-                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
-              />
+              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Şifre</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password" disabled={locked}
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors disabled:opacity-50" />
             </div>
-
-            {error && (
-              <div className="flex items-start gap-2 text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {locked && (
-              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
-                <Timer className="h-3.5 w-3.5 shrink-0" />
-                <span>Giriş kilitlendi — {remaining}s sonra tekrar deneyin</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || locked || !email || !password}
-              className="w-full mt-2 bg-primary text-black font-bold tracking-[0.18em] text-[11px] uppercase rounded-lg py-3 hover:opacity-90 transition-all hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Doğrulanıyor…</>
-              ) : locked ? (
-                <><Timer className="h-4 w-4" /> Kilitli ({remaining}s)</>
-              ) : (
-                "Giriş Yap"
-              )}
+            {error && <p className="text-xs text-red-500 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{error}</p>}
+            {locked && <p className="text-xs text-amber-500 flex items-center gap-1.5"><Timer className="h-3.5 w-3.5 shrink-0" />{remaining}s sonra tekrar deneyin</p>}
+            <button type="submit" disabled={loading || locked || !email || !password}
+              className="w-full bg-primary text-black font-bold text-[11px] uppercase tracking-widest rounded-lg py-3 hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2">
+              {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Doğrulanıyor…</> : locked ? `Kilitli (${remaining}s)` : "Giriş Yap"}
             </button>
           </form>
         </div>
-
-        <div className="mt-5 text-center flex items-center justify-center gap-4">
-          <Link to="/" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-            ← Siteye Dön
-          </Link>
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <Link to="/" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">← Siteye Dön</Link>
           <span className="text-muted-foreground/30">·</span>
           <AdminThemeToggle />
         </div>
@@ -216,66 +147,548 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
   );
 }
 
-function DevBanner() {
+// ── Dashboard View ────────────────────────────────────────────────────────────
+function DashboardView({ items, loading, categoryOptions, setView }: {
+  items: AdminItem[];
+  loading: boolean;
+  categoryOptions: { id: string; title: string }[];
+  setView: (v: AdminView) => void;
+}) {
+  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>;
+
+  const total = items.length;
+  const available = items.filter(i => i.available).length;
+  const out = total - available;
+
+  const stats = [
+    { label: "Toplam Ürün", value: total, icon: Package, color: "text-blue-500" },
+    { label: "Mevcut", value: available, icon: CheckCircle2, color: "text-emerald-500" },
+    { label: "Tükendi", value: out, icon: AlertCircle, color: "text-red-500" },
+    { label: "Kategori", value: categoryOptions.length, icon: TrendingUp, color: "text-primary" },
+  ];
+
   return (
-    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 shrink-0">
-      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-      <span className="text-[11px] text-amber-600 dark:text-amber-300">
-        Geliştirme modu — Supabase yapılandırılmamış. Veriler yalnızca bu oturumda kaydedilir.
-      </span>
+    <div className="space-y-8">
+      <div>
+        <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/60 mb-1">Stella Lounge</p>
+        <h1 className="font-display text-3xl sm:text-4xl text-foreground font-light">Kontrol Paneli</h1>
+        <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
+          <span className={`h-1.5 w-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"}`} />
+          {isSupabaseConfigured ? "Veritabanı bağlı" : "Geliştirme modu"}
+          <span className="text-muted-foreground/40">·</span>{total} ürün
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {stats.map(s => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} className="rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-all">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{s.label}</span>
+                <div className="h-7 w-7 rounded-lg bg-muted/50 flex items-center justify-center">
+                  <Icon className={`h-3.5 w-3.5 ${s.color}`} />
+                </div>
+              </div>
+              <div className="font-display text-4xl text-foreground font-light">{s.value}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-display text-xl font-light text-foreground">Kategoriye Göre</h2>
+            <button onClick={() => setView("menu")}
+              className="text-[10px] text-primary/70 hover:text-primary flex items-center gap-1.5 uppercase tracking-wider">
+              Yönet <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="space-y-4">
+            {categoryOptions.map(c => {
+              const count = items.filter(i => i.category === c.id).length;
+              const pct = total ? (count / total) * 100 : 0;
+              const avail = items.filter(i => i.category === c.id && i.available).length;
+              return (
+                <div key={c.id}>
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-sm text-foreground/80">{c.title}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{avail}/{count}</span>
+                  </div>
+                  <div className="h-0.5 bg-muted/60 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#7a5b10] via-primary to-[#f5e06e] rounded-full" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h2 className="font-display text-xl font-light text-foreground mb-4">Son Eklenenler</h2>
+          <ul className="space-y-3">
+            {items.slice(0, 6).map(i => (
+              <li key={i.id} className="flex items-center gap-3">
+                {i.img
+                  ? <img src={i.img} alt="" className="h-9 w-9 rounded-lg object-cover border border-border" loading="lazy" />
+                  : <div className="h-9 w-9 rounded-lg bg-muted border border-border" />}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">{i.name}</div>
+                  <div className="text-[10px] text-muted-foreground">{categoryTitle(i.category, categoryOptions)}</div>
+                </div>
+                <span className={`text-[9px] px-2 py-0.5 rounded-full ${i.available ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-400"}`}>
+                  {i.available ? "●" : "○"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── Admin Layout ──────────────────────────────────────────────────────────────
-function AdminLayout() {
-  const { pathname } = useLocation();
-  const [open, setOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [session, setSession] = useState<any>(null);
-  // If Supabase is not configured, skip auth check entirely
+// ── Menu View ─────────────────────────────────────────────────────────────────
+type FormState = {
+  id?: string; name: string; name_bg: string; name_gr: string;
+  desc: string; desc_bg: string; desc_gr: string;
+  category: string; price: string; img: string;
+  available: boolean; sort_order: number;
+};
+const emptyForm = (sort = 0, cat = ""): FormState => ({
+  name: "", name_bg: "", name_gr: "", desc: "", desc_bg: "", desc_gr: "",
+  category: cat, price: "", img: "", available: true, sort_order: sort,
+});
+
+function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggleAvail }: ReturnType<typeof useAdminItems>) {
+  const [query, setQuery] = useState("");
+  const [filterCat, setFilterCat] = useState("all");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyForm());
+  const [confirmDelete, setConfirmDelete] = useState<AdminItem | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [drag, setDrag] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imgMode, setImgMode] = useState<"upload" | "url">("upload");
+
+  const filtered = useMemo(() =>
+    items.filter(i =>
+      (filterCat === "all" || i.category === filterCat) &&
+      i.name.toLowerCase().includes(query.toLowerCase())
+    ), [items, query, filterCat]);
+
+  const openNew = () => { setForm(emptyForm(items.length * 10, categoryOptions[0]?.id ?? "")); setDrawerOpen(true); };
+  const openEdit = (it: AdminItem) => {
+    setForm({ id: it.id, name: it.name, name_bg: it.name_bg, name_gr: it.name_gr, desc: it.desc, desc_bg: it.desc_bg, desc_gr: it.desc_gr, category: it.category, price: it.price, img: it.img, available: it.available, sort_order: it.sort_order });
+    setDrawerOpen(true);
+  };
+  const closeDrawer = () => { setDrawerOpen(false); setSaveError(""); };
+
+  const handleFile = async (file?: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setForm(f => ({ ...f, img: url }));
+    } catch (e) { setSaveError(e instanceof Error ? e.message : "Yükleme hatası"); }
+    finally { setUploading(false); }
+  };
+
+  const submit = async () => {
+    if (!form.name.trim() || !form.price.trim()) return;
+    setSaving(true); setSaveError("");
+    const item: AdminItem = {
+      id: form.id ?? `new-${Date.now()}`,
+      name: form.name, name_bg: form.name_bg || form.name, name_gr: form.name_gr || form.name,
+      desc: form.desc, desc_bg: form.desc_bg || form.desc, desc_gr: form.desc_gr || form.desc,
+      category: form.category, price: form.price, img: form.img, available: form.available, sort_order: form.sort_order,
+    };
+    const res = await saveItem(item);
+    if (res.error) setSaveError(res.error); else closeDrawer();
+    setSaving(false);
+  };
+
+  const handleDelete = useCallback(async (id: string) => {
+    await deleteItem(id); setConfirmDelete(null);
+  }, [deleteItem]);
+
+  const set = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }));
+
+  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/60 mb-1">Stella Lounge</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-light text-foreground">Menü Yönetimi</h1>
+          <p className="text-sm text-muted-foreground mt-1">{items.length} ürün · {filtered.length} görüntüleniyor</p>
+        </div>
+        <button onClick={openNew} className="inline-flex items-center gap-2 bg-primary text-black px-5 py-2.5 rounded-lg text-sm font-bold hover:opacity-90 transition-all">
+          <Plus className="h-4 w-4" /> Yeni Ürün
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ürünlerde ara…"
+            className="w-full bg-card border border-border rounded-lg pl-9 pr-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/60" />
+        </div>
+        <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+          className="bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors">
+          <option value="all">Tüm Kategoriler</option>
+          {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+        </select>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="px-5 py-4 font-medium">Görsel</th>
+                <th className="px-5 py-4 font-medium">Ürün</th>
+                <th className="px-5 py-4 font-medium hidden md:table-cell">Kategori</th>
+                <th className="px-5 py-4 font-medium">Fiyat</th>
+                <th className="px-5 py-4 font-medium">Durum</th>
+                <th className="px-5 py-4 font-medium text-right">İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(i => (
+                <tr key={i.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                  <td className="px-5 py-3">
+                    {i.img
+                      ? <img src={i.img} alt={i.name} loading="lazy" className="h-12 w-12 rounded-lg object-cover border border-border" />
+                      : <div className="h-12 w-12 rounded-lg bg-muted/30 flex items-center justify-center border border-border"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>}
+                  </td>
+                  <td className="px-5 py-3 font-medium text-foreground">{i.name}</td>
+                  <td className="px-5 py-3 hidden md:table-cell text-muted-foreground text-xs">{categoryTitle(i.category, categoryOptions)}</td>
+                  <td className="px-5 py-3 text-primary font-medium whitespace-nowrap">{i.price}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <Toggle checked={i.available} onChange={() => toggleAvail(i.id)} size="sm" />
+                      <span className={`text-xs ${i.available ? "text-emerald-500" : "text-red-400"}`}>{i.available ? "Mevcut" : "Tükendi"}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => openEdit(i)} className="p-2 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => setConfirmDelete(i)} className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-400 text-muted-foreground transition-colors"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-16 text-center text-sm text-muted-foreground">Ürün bulunamadı.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Drawer */}
+      <div className={`fixed inset-0 z-40 bg-black/65 transition-opacity duration-300 ${drawerOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={closeDrawer} />
+      <aside className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] bg-background border-l border-border shadow-2xl transition-transform duration-300 ${drawerOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
+        <div className="h-16 px-6 flex items-center justify-between border-b border-border shrink-0">
+          <h2 className="font-display text-lg text-foreground">{form.id ? "Ürünü Düzenle" : "Yeni Ürün"}</h2>
+          <button onClick={closeDrawer} className="p-2 rounded-lg hover:bg-muted/40 text-muted-foreground"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <FField label="Ürün Adı (TR)"><input value={form.name} onChange={e => set({ name: e.target.value })} placeholder="Stella Martini" className="adm-inp" autoFocus /></FField>
+          <FField label="Açıklama (TR)"><textarea value={form.desc} onChange={e => set({ desc: e.target.value })} rows={2} className="adm-inp resize-none" /></FField>
+
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button onClick={() => setImgMode("upload")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imgMode === "upload" ? "bg-primary/15 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}><Cloud className="h-3.5 w-3.5" />Yükle</button>
+              <button onClick={() => setImgMode("url")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imgMode === "url" ? "bg-primary/15 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}><Link2 className="h-3.5 w-3.5" />URL</button>
+            </div>
+            {imgMode === "upload" ? (
+              <div onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+                onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]); }}
+                className={`rounded-xl border-2 border-dashed transition-all ${drag ? "border-primary bg-primary/5" : "border-border/60 bg-muted/20"}`}>
+                {form.img
+                  ? <div className="p-3 flex items-center gap-3"><img src={form.img} alt="" className="h-20 w-20 rounded-lg object-cover" /><button onClick={() => set({ img: "" })} className="text-xs text-red-400 hover:underline ml-auto">Kaldır</button></div>
+                  : <label className="flex flex-col items-center py-8 cursor-pointer">
+                      {uploading ? <Loader2 className="h-7 w-7 text-primary animate-spin mb-2" /> : <UploadCloud className="h-7 w-7 text-primary mb-2" />}
+                      <span className="text-sm text-foreground">{uploading ? "Yükleniyor…" : <><span>Sürükleyin veya </span><span className="text-primary underline">göz atın</span></>}</span>
+                      {!isCloudinaryConfigured && !uploading && <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Cloudinary yok — base64</span>}
+                      <input type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files?.[0])} disabled={uploading} />
+                    </label>}
+              </div>
+            ) : (
+              <div>
+                <input type="url" value={form.img} onChange={e => set({ img: e.target.value })} placeholder="https://..." className="adm-inp" />
+                {form.img && <img src={form.img} alt="" className="mt-2 h-20 w-20 rounded-lg object-cover" onError={e => (e.currentTarget.style.display = "none")} />}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FField label="Ad (BG)"><input value={form.name_bg} onChange={e => set({ name_bg: e.target.value })} placeholder="Boş = TR" className="adm-inp" /></FField>
+            <FField label="Ad (GR)"><input value={form.name_gr} onChange={e => set({ name_gr: e.target.value })} placeholder="Boş = TR" className="adm-inp" /></FField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FField label="Kategori">
+              <select value={form.category} onChange={e => set({ category: e.target.value })} className="adm-inp">
+                {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+            </FField>
+            <FField label="Fiyat"><input value={form.price} onChange={e => set({ price: e.target.value })} placeholder="200 ₺" className="adm-inp" /></FField>
+          </div>
+          <FField label="Sıra"><input type="number" value={form.sort_order} onChange={e => set({ sort_order: Number(e.target.value) })} className="adm-inp" /></FField>
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
+            <div><div className="text-sm text-foreground">Durum</div><div className="text-xs text-muted-foreground mt-0.5">{form.available ? "Menüde görünür" : "Tükendi"}</div></div>
+            <Toggle checked={form.available} onChange={v => set({ available: v })} />
+          </div>
+          {saveError && <p className="text-sm text-red-400 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{saveError}</p>}
+          <style>{`.adm-inp{width:100%;background:var(--background);border:1px solid var(--border);border-radius:.5rem;padding:.5rem .75rem;font-size:.875rem;color:var(--foreground);transition:border-color .2s}.adm-inp:focus{outline:none;border-color:var(--primary)}.adm-inp::placeholder{color:var(--muted-foreground);opacity:.6}.adm-inp option{background:var(--card);color:var(--foreground)}`}</style>
+        </div>
+        <div className="p-6 border-t border-border flex gap-3 shrink-0">
+          <button onClick={closeDrawer} className="flex-1 border border-border text-foreground rounded-lg py-2.5 text-sm hover:bg-muted/40 transition-colors">İptal</button>
+          <button onClick={submit} disabled={saving || uploading} className="flex-1 bg-primary text-black rounded-lg py-2.5 text-sm font-bold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Kaydediliyor…" : form.id ? "Kaydet" : "Ekle"}
+          </button>
+        </div>
+      </aside>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75" onClick={() => setConfirmDelete(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-lg text-foreground">Ürünü sil?</h3>
+            <p className="text-sm text-muted-foreground mt-2">"{confirmDelete.name}" kalıcı silinecek.</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 border border-border rounded-lg py-2.5 text-sm text-foreground hover:bg-muted/40 transition-colors">İptal</button>
+              <button onClick={() => handleDelete(confirmDelete.id)} className="flex-1 bg-red-500/90 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-red-500">Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block"><span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">{label}</span>{children}</label>;
+}
+
+// ── Settings View ─────────────────────────────────────────────────────────────
+type SettingsMap = { venue_name: string; phone: string; instagram: string; address: string; hours_weekday: string; hours_weekend: string; maintenance_mode: string };
+const settingsDefaults: SettingsMap = {
+  venue_name: "Stella Cafe & Lounge", phone: "+90 555 000 0000",
+  instagram: "https://www.instagram.com/stella_cafe_lounge/",
+  address: "Cumhuriyet Meydanı, No: 1, Kırklareli Merkez",
+  hours_weekday: "09:00 – 00:00", hours_weekend: "09:00 – 02:00", maintenance_mode: "false",
+};
+
+function SettingsView() {
+  const [settings, setSettings] = useState<SettingsMap>(settingsDefaults);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const timer = setTimeout(() => { setError("Zaman aşımı."); setLoading(false); }, 8000);
+    supabase.from("settings").select("key, value")
+      .then(({ data, error: err }: { data: { key: string; value: string }[] | null; error: { message: string } | null }) => {
+        clearTimeout(timer);
+        if (err) { setError(err.message); }
+        else if (data) {
+          const map: Record<string, string> = {};
+          data.forEach(r => { map[r.key] = r.value; });
+          setSettings(p => ({ ...p, ...map } as SettingsMap));
+        }
+        setLoading(false);
+      })
+      .catch((e: Error) => { clearTimeout(timer); setError(e.message); setLoading(false); });
+  }, []);
+
+  const set = (k: keyof SettingsMap, v: string) => setSettings(p => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    setSaving(true); setError(""); setSaved(false);
+    try {
+      if (isSupabaseConfigured) {
+        const rows = Object.entries(settings).map(([key, value]) => ({ key, value }));
+        const { error: err } = await supabase.from("settings").upsert(rows, { onConflict: "key" });
+        if (err) { setError(err.message); setSaving(false); return; }
+      }
+      setSaved(true); setTimeout(() => setSaved(false), 3000);
+    } catch (e) { setError(e instanceof Error ? e.message : "Hata"); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>;
+
+  const inp = "w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors";
+
+  return (
+    <div className="max-w-2xl space-y-8">
+      <div>
+        <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/60 mb-1">Stella Lounge</p>
+        <h1 className="font-display text-3xl sm:text-4xl text-foreground font-light">Ayarlar</h1>
+      </div>
+      {!isSupabaseConfigured && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/8 p-4">
+          <Database className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">Supabase bağlantısı yok — değişiklikler kaydedilmez.</p>
+        </div>
+      )}
+      <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <h2 className="font-display text-lg text-primary">İşletme Bilgileri</h2>
+        {(["venue_name", "phone", "instagram"] as const).map(k => (
+          <label key={k} className="block">
+            <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+              {k === "venue_name" ? "İşletme Adı" : k === "phone" ? "Telefon" : "Instagram URL"}
+            </span>
+            <input value={settings[k]} onChange={e => set(k, e.target.value)} className={inp} />
+          </label>
+        ))}
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Adres</span>
+          <textarea value={settings.address} onChange={e => set("address", e.target.value)} rows={2} className={`${inp} resize-none`} />
+        </label>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <h2 className="font-display text-lg text-primary">Çalışma Saatleri</h2>
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Pazartesi – Perşembe</span>
+          <input value={settings.hours_weekday} onChange={e => set("hours_weekday", e.target.value)} placeholder="09:00 – 00:00" className={inp} />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Cuma – Pazar</span>
+          <input value={settings.hours_weekend} onChange={e => set("hours_weekend", e.target.value)} placeholder="09:00 – 02:00" className={inp} />
+        </label>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-6">
+        <h2 className="font-display text-lg text-primary mb-5">Site Ayarları</h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm text-foreground">Bakım Modu</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Ziyaretçilere bakım mesajı gösterir.</div>
+          </div>
+          <Toggle checked={settings.maintenance_mode === "true"} onChange={v => set("maintenance_mode", String(v))} />
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-500 flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"><AlertTriangle className="h-4 w-4" />{error}</p>}
+      <button onClick={save} disabled={saving}
+        className="inline-flex items-center gap-2 bg-primary text-black px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] transition-all disabled:opacity-60">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+        {saving ? "Kaydediliyor…" : saved ? "Kaydedildi!" : "Değişiklikleri Kaydet"}
+      </button>
+    </div>
+  );
+}
+
+// ── Authed Admin (rendered only after auth is confirmed) ──────────────────────
+function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
+  const [view, setView] = useState<AdminView>("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const adminData = useAdminItems();
+
+  const nav = [
+    { id: "dashboard" as AdminView, label: "Kontrol Paneli", icon: LayoutDashboard },
+    { id: "menu" as AdminView, label: "Menü Yönetimi", icon: UtensilsCrossed },
+    { id: "settings" as AdminView, label: "Ayarlar", icon: Cog },
+  ];
+
+  return (
+    <div className="min-h-screen flex bg-background text-foreground">
+      {/* Sidebar */}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 bg-card border-r border-border flex flex-col`}>
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
+        <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
+          <img src="/stella-logo.png" alt="Stella" className="h-10 w-auto object-contain" loading="eager" />
+          <div className="h-4 w-px bg-primary/25" />
+          <span className="font-display text-[11px] tracking-[0.4em] text-primary/50 italic">admin</span>
+        </div>
+        <nav className="flex-1 p-3 pt-4 space-y-0.5">
+          {nav.map(n => {
+            const active = view === n.id;
+            const Icon = n.icon;
+            return (
+              <button key={n.id} onClick={() => { setView(n.id); setSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${active ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent"}`}>
+                <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : ""}`} />
+                <span className={active ? "font-medium" : ""}>{n.label}</span>
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(212,175,55,0.8)]" />}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="p-3 border-t border-border space-y-0.5">
+          <Link to="/" target="_blank" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent transition-all">
+            <Eye className="h-4 w-4 shrink-0" />Siteyi Görüntüle
+          </Link>
+          {isSupabaseConfigured && (
+            <button onClick={onSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/5 border border-transparent transition-all">
+              <LogOut className="h-4 w-4 shrink-0" />Çıkış Yap
+            </button>
+          )}
+          <div className="px-3 pt-2 pb-1">
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/15 to-transparent mb-2" />
+            <div className="flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <p className="text-[10px] text-muted-foreground/40">{isSupabaseConfigured ? "Veritabanı bağlı" : "Geliştirme modu"}</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+
+      {/* Main */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {!isSupabaseConfigured && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <span className="text-[11px] text-amber-600 dark:text-amber-300">Geliştirme modu — Supabase yapılandırılmamış.</span>
+          </div>
+        )}
+        <header className="h-16 sticky top-0 z-20 bg-background/95 backdrop-blur-2xl border-b border-border flex items-center px-4 lg:px-8 gap-3 shrink-0">
+          <button onClick={() => setSidebarOpen(v => !v)} className="lg:hidden p-2 rounded-lg hover:bg-muted/50 transition-colors">
+            {sidebarOpen ? <X className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+          </button>
+          <div className="font-display text-base tracking-[0.25em] text-muted-foreground/60 select-none">
+            Stella <span className="text-primary/80">·</span> <span className="text-primary font-medium">Admin</span>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />Yayında
+            </div>
+            <div className="h-6 w-px bg-border hidden sm:block" />
+            <AdminThemeToggle />
+            <div className="h-6 w-px bg-border" />
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-[#7a5b10] flex items-center justify-center text-black text-xs font-bold">S</div>
+          </div>
+        </header>
+        <main className="flex-1 p-4 lg:p-8 overflow-x-hidden overflow-y-auto">
+          {view === "dashboard" && <DashboardView {...adminData} setView={setView} />}
+          {view === "menu" && <MenuView {...adminData} />}
+          {view === "settings" && <SettingsView />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ── Root component registered with TanStack Router ────────────────────────────
+function AdminRoot() {
+  const [session, setSession] = useState<unknown>(null);
   const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-
     let active = true;
-
-    // Fallback: if getSession() hangs longer than 4s, proceed to login screen.
-    // Using requestAnimationFrame loop instead of setTimeout to avoid
-    // microtask-queue starvation (Supabase Promise chains can block macrotasks).
-    const start = Date.now();
-    let rafId: number;
-    function checkTimeout() {
-      if (!active) return;
-      if (Date.now() - start >= 4000) {
-        setAuthChecked(true);
-        return;
-      }
-      rafId = requestAnimationFrame(checkTimeout);
-    }
-    rafId = requestAnimationFrame(checkTimeout);
-
-    // One-shot session check — no persistent subscription.
-    // onAuthStateChange is intentionally omitted: in Supabase JS v2 it can
-    // trigger rapid TOKEN_REFRESHED microtask chains that starve the event loop.
+    const timer = setTimeout(() => { if (active) setAuthChecked(true); }, 4000);
     supabase.auth.getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        cancelAnimationFrame(rafId);
-        setSession(data?.session ?? null);
-        setAuthChecked(true);
-      })
-      .catch(() => {
-        if (!active) return;
-        cancelAnimationFrame(rafId);
-        setAuthChecked(true);
-      });
-
-    return () => {
-      active = false;
-      cancelAnimationFrame(rafId);
-    };
+      .then(({ data }) => { if (!active) return; clearTimeout(timer); setSession(data?.session ?? null); setAuthChecked(true); })
+      .catch(() => { if (!active) return; clearTimeout(timer); setAuthChecked(true); });
+    return () => { active = false; clearTimeout(timer); };
   }, []);
 
   if (!authChecked) {
@@ -292,123 +705,8 @@ function AdminLayout() {
     return <LoginScreen onLogin={(s) => setSession(s)} />;
   }
 
-  const isActive = (to: string, exact?: boolean) =>
-    exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
-
-  const handleSignOut = async () => {
-    if (isSupabaseConfigured) {
-      try { await supabase.auth.signOut(); } catch { /* ignore */ }
-    }
+  return <AuthedAdmin onSignOut={async () => {
+    if (isSupabaseConfigured) try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setSession(null);
-  };
-
-  return (
-    <div className="min-h-screen flex bg-background text-foreground">
-      {/* ── Sidebar ── */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 bg-card border-r border-border flex flex-col`}
-      >
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
-
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
-          <img src="/stella-logo.png" alt="Stella" className="h-10 w-auto object-contain" loading="eager" />
-          <div className="h-4 w-px bg-primary/25" />
-          <span className="font-display text-[11px] tracking-[0.4em] text-primary/50 italic">admin</span>
-        </div>
-
-        <nav className="flex-1 p-3 pt-4 space-y-0.5">
-          {nav.map((n) => {
-            const active = isActive(n.to, n.exact);
-            const Icon = n.icon;
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                onClick={() => setOpen(false)}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                  active
-                    ? "bg-primary/10 text-primary border border-primary/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent"
-                }`}
-              >
-                <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "group-hover:text-foreground"}`} />
-                <span className={active ? "font-medium" : ""}>{n.label}</span>
-                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(212,175,55,0.8)]" />}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-border space-y-0.5">
-          <Link
-            to="/"
-            target="_blank"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 border border-transparent transition-all"
-          >
-            <Eye className="h-4 w-4 shrink-0" />
-            Siteyi Görüntüle
-          </Link>
-          {isSupabaseConfigured && session && (
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/5 border border-transparent transition-all"
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              Çıkış Yap
-            </button>
-          )}
-          <div className="px-3 pt-2 pb-1">
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/15 to-transparent mb-2" />
-            <div className="flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"}`} />
-              <p className="text-[10px] text-muted-foreground/40">
-                {isSupabaseConfigured ? "Veritabanı bağlı" : "Geliştirme modu"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {open && (
-        <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setOpen(false)} />
-      )}
-
-      {/* ── Main ── */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {!isSupabaseConfigured && <DevBanner />}
-
-        <header className="h-16 sticky top-0 z-20 bg-background/95 backdrop-blur-2xl border-b border-border flex items-center px-4 lg:px-8 gap-3 shrink-0">
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="lg:hidden p-2 rounded-lg hover:bg-muted/50 transition-colors"
-            aria-label="Menüyü aç/kapat"
-          >
-            {open ? <X className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
-          </button>
-          <div className="font-display text-base tracking-[0.25em] text-muted-foreground/60 select-none">
-            Stella <span className="text-primary/80">·</span>{" "}
-            <span className="text-primary font-medium">Admin</span>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 tracking-wider">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-              Yayında
-            </div>
-            <div className="h-6 w-px bg-border hidden sm:block" />
-            <AdminThemeToggle />
-            <div className="h-6 w-px bg-border" />
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-[#7a5b10] flex items-center justify-center text-black text-xs font-bold shadow-[0_0_12px_rgba(212,175,55,0.25)]">
-              S
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 lg:p-8 overflow-x-hidden overflow-y-auto">
-          <Outlet />
-        </main>
-      </div>
-    </div>
-  );
+  }} />;
 }
