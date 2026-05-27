@@ -37,15 +37,27 @@ function SettingsPage() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
+    const timer = setTimeout(() => {
+      setError("Bağlantı zaman aşımı — varsayılan değerler kullanılıyor.");
+      setLoading(false);
+    }, 8000);
     supabase
       .from("settings")
       .select("key, value")
-      .then(({ data }: { data: Array<{ key: string; value: string }> | null }) => {
-        if (data) {
+      .then(({ data, error }: { data: Array<{ key: string; value: string }> | null; error: { message: string } | null }) => {
+        clearTimeout(timer);
+        if (error) {
+          setError(`Ayarlar yüklenemedi: ${error.message}`);
+        } else if (data) {
           const map: Record<string, string> = {};
           data.forEach((r) => { map[r.key] = r.value; });
           setSettings((prev) => ({ ...prev, ...map } as Settings));
         }
+        setLoading(false);
+      })
+      .catch((e: Error) => {
+        clearTimeout(timer);
+        setError(`Bağlantı hatası: ${e.message}`);
         setLoading(false);
       });
   }, []);
@@ -72,7 +84,7 @@ function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 text-[#d4af37] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -80,22 +92,22 @@ function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-8 animate-fade-up">
       <div>
-        <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-[#d4af37]/60 mb-1">Stella Lounge</p>
-        <h1 className="font-display text-3xl sm:text-4xl tracking-wide font-light">Ayarlar</h1>
+        <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/60 mb-1">Stella Lounge</p>
+        <h1 className="font-display text-3xl sm:text-4xl text-foreground tracking-wide font-light">Ayarlar</h1>
         <p className="text-sm text-muted-foreground mt-1.5">İşletme bilgilerini ve tercihlerinizi yönetin.</p>
       </div>
 
       {!isSupabaseConfigured && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/8 p-4">
-          <Database className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-sm text-amber-300">
+          <Database className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">
             Supabase bağlantısı yok — değişiklikler bu oturumda kaydedilmez.
           </p>
         </div>
       )}
 
-      <section className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#0d0d0d] p-6 space-y-5">
-        <h2 className="font-display text-lg text-[#d4af37]">İşletme Bilgileri</h2>
+      <section className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <h2 className="font-display text-lg text-primary">İşletme Bilgileri</h2>
         <Field label="İşletme Adı">
           <Inp value={settings.venue_name} onChange={(v) => set("venue_name", v)} />
         </Field>
@@ -115,8 +127,8 @@ function SettingsPage() {
         </Field>
       </section>
 
-      <section className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#0d0d0d] p-6 space-y-5">
-        <h2 className="font-display text-lg text-[#d4af37]">Çalışma Saatleri</h2>
+      <section className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <h2 className="font-display text-lg text-primary">Çalışma Saatleri</h2>
         <Field label="Pazartesi – Perşembe">
           <Inp value={settings.hours_weekday} onChange={(v) => set("hours_weekday", v)} placeholder="09:00 – 00:00" />
         </Field>
@@ -125,11 +137,11 @@ function SettingsPage() {
         </Field>
       </section>
 
-      <section className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#0d0d0d] p-6">
-        <h2 className="font-display text-lg text-[#d4af37] mb-5">Site Ayarları</h2>
+      <section className="rounded-xl border border-border bg-card p-6">
+        <h2 className="font-display text-lg text-primary mb-5">Site Ayarları</h2>
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm">Bakım Modu</div>
+            <div className="text-sm text-foreground">Bakım Modu</div>
             <div className="text-xs text-muted-foreground mt-0.5">Aktif edildiğinde site ziyaretçilere bakım mesajı gösterir.</div>
           </div>
           <Toggle
@@ -140,7 +152,7 @@ function SettingsPage() {
       </section>
 
       {error && (
-        <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -149,7 +161,7 @@ function SettingsPage() {
       <button
         onClick={save}
         disabled={saving}
-        className="inline-flex items-center gap-2 bg-[#d4af37] text-black px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#e8cf85] hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] transition-all disabled:opacity-60"
+        className="inline-flex items-center gap-2 bg-primary text-black px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] transition-all disabled:opacity-60"
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
         {saving ? "Kaydediliyor…" : saved ? "Kaydedildi!" : "Değişiklikleri Kaydet"}
@@ -158,15 +170,16 @@ function SettingsPage() {
       <style>{`
         .adm-input {
           width: 100%;
-          background: rgba(0,0,0,0.6);
-          border: 1px solid rgba(212,175,55,0.15);
+          background: var(--background);
+          border: 1px solid var(--border);
           border-radius: 0.5rem;
           padding: 0.625rem 0.75rem;
           font-size: 0.875rem;
           color: var(--foreground);
           transition: border-color 0.2s;
         }
-        .adm-input:focus { outline: none; border-color: #d4af37; }
+        .adm-input:focus { outline: none; border-color: var(--primary); }
+        .adm-input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
       `}</style>
     </div>
   );

@@ -13,6 +13,7 @@ import { Route as MenuRouteImport } from './routes/menu'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as HizmetlerSlugRouteImport } from './routes/hizmetler.$slug'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminMenuRouteImport } from './routes/admin.menu'
 
@@ -36,6 +37,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const HizmetlerSlugRoute = HizmetlerSlugRouteImport.update({
+  id: '/hizmetler/$slug',
+  path: '/hizmetler/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/menu': typeof MenuRoute
   '/admin/menu': typeof AdminMenuRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/hizmetler/$slug': typeof HizmetlerSlugRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/menu': typeof MenuRoute
   '/admin/menu': typeof AdminMenuRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/hizmetler/$slug': typeof HizmetlerSlugRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/menu': typeof MenuRoute
   '/admin/menu': typeof AdminMenuRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/hizmetler/$slug': typeof HizmetlerSlugRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -79,9 +88,16 @@ export interface FileRouteTypes {
     | '/menu'
     | '/admin/menu'
     | '/admin/settings'
+    | '/hizmetler/$slug'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/menu' | '/admin/menu' | '/admin/settings' | '/admin'
+  to:
+    | '/'
+    | '/menu'
+    | '/admin/menu'
+    | '/admin/settings'
+    | '/hizmetler/$slug'
+    | '/admin'
   id:
     | '__root__'
     | '/'
@@ -89,6 +105,7 @@ export interface FileRouteTypes {
     | '/menu'
     | '/admin/menu'
     | '/admin/settings'
+    | '/hizmetler/$slug'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -96,6 +113,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   MenuRoute: typeof MenuRoute
+  HizmetlerSlugRoute: typeof HizmetlerSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -127,6 +145,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/hizmetler/$slug': {
+      id: '/hizmetler/$slug'
+      path: '/hizmetler/$slug'
+      fullPath: '/hizmetler/$slug'
+      preLoaderRoute: typeof HizmetlerSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/settings': {
       id: '/admin/settings'
@@ -163,7 +188,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   MenuRoute: MenuRoute,
+  HizmetlerSlugRoute: HizmetlerSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

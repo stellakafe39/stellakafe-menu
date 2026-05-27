@@ -237,18 +237,23 @@ function Landing() {
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-7 pt-2">
               {[
-                { icon: Coffee,   title: "Premium Kahve",   desc: "Dünyanın en iyi bölgelerinden özenle seçilmiş çekirdekler." },
-                { icon: Wine,     title: "İmza İçecekler",  desc: "Uzman miksologlarımızın ellerinden çıkan eşsiz tatlar." },
-                { icon: ChefHat,  title: "Gurme Lezzetler", desc: "Günlük taze hazırlanan özel tatlılar ve atıştırmalıklar." },
-                { icon: StarIcon, title: "Lüks Atmosfer",   desc: "Modern ve konforlu tasarımıyla kusursuz bir ortam." },
-              ].map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex flex-col gap-2.5">
-                  <div className="h-9 w-9 rounded-lg border border-primary/20 bg-primary/8 flex items-center justify-center">
-                    <Icon className="h-4 w-4 text-primary" />
+                { icon: Coffee,   title: "Premium Kahve",   desc: "Dünyanın en iyi bölgelerinden özenle seçilmiş çekirdekler.", slug: "premium-kahve" },
+                { icon: Wine,     title: "İmza İçecekler",  desc: "Uzman miksologlarımızın ellerinden çıkan eşsiz tatlar.", slug: "imza-icecekler" },
+                { icon: ChefHat,  title: "Gurme Lezzetler", desc: "Günlük taze hazırlanan özel tatlılar ve atıştırmalıklar.", slug: "gurme-lezzetler" },
+                { icon: StarIcon, title: "Lüks Atmosfer",   desc: "Modern ve konforlu tasarımıyla kusursuz bir ortam.", slug: "luks-atmosfer" },
+              ].map(({ icon: Icon, title, desc, slug }) => (
+                <Link
+                  key={title}
+                  to="/hizmetler/$slug"
+                  params={{ slug }}
+                  className="flex flex-col gap-2.5 group hover:-translate-y-1 transition-transform duration-300"
+                >
+                  <div className="h-9 w-9 rounded-lg border border-primary/20 bg-primary/8 flex items-center justify-center group-hover:bg-primary group-hover:border-primary transition-colors">
+                    <Icon className="h-4 w-4 text-primary group-hover:text-black transition-colors" />
                   </div>
-                  <h4 className="font-sans text-sm font-semibold text-foreground">{title}</h4>
+                  <h4 className="font-sans text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{title}</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
-                </div>
+                </Link>
               ))}
             </div>
 

@@ -13,7 +13,7 @@ import {
   Link2,
   Cloud,
 } from "lucide-react";
-import { useAdminItems, CATEGORY_OPTIONS, categoryTitle, type AdminItem } from "@/lib/admin-store";
+import { useAdminItems, categoryTitle, type AdminItem } from "@/lib/admin-store";
 import { Toggle } from "@/components/admin/Toggle";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -63,14 +63,14 @@ type FormState = {
   sort_order: number;
 };
 
-const emptyForm = (sort = 0): FormState => ({
+const emptyForm = (sort = 0, firstCategory = ""): FormState => ({
   name: "",
   name_bg: "",
   name_gr: "",
   desc: "",
   desc_bg: "",
   desc_gr: "",
-  category: CATEGORY_OPTIONS[0]?.id ?? "",
+  category: firstCategory,
   price: "",
   img: "",
   available: true,
@@ -79,7 +79,7 @@ const emptyForm = (sort = 0): FormState => ({
 
 // ── Main component ────────────────────────────────────────────────────────────
 function MenuManagement() {
-  const { items, loading, saveItem, deleteItem, toggleAvail } = useAdminItems();
+  const { items, loading, categoryOptions, saveItem, deleteItem, toggleAvail } = useAdminItems();
   const [query, setQuery] = useState("");
   const [filterCat, setFilterCat] = useState("all");
   const [drawer, setDrawer] = useState<{ open: boolean; form: FormState }>({
@@ -101,7 +101,7 @@ function MenuManagement() {
   );
 
   const openNew = () =>
-    setDrawer({ open: true, form: emptyForm(items.length * 10) });
+    setDrawer({ open: true, form: emptyForm(items.length * 10, categoryOptions[0]?.id ?? "") });
 
   const openEdit = (it: AdminItem) =>
     setDrawer({
@@ -163,7 +163,7 @@ function MenuManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 text-[#d4af37] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -173,16 +173,16 @@ function MenuManagement() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-[#d4af37]/60 mb-1">Stella Lounge</p>
-          <h1 className="font-display text-3xl sm:text-4xl tracking-wide font-light">Menü Yönetimi</h1>
+          <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/60 mb-1">Stella Lounge</p>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-wide font-light text-foreground">Menü Yönetimi</h1>
           <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
             <span>{items.length} ürün · {filtered.length} görüntüleniyor</span>
-            {isSupabaseConfigured && <span className="text-emerald-400/80 text-[10px] tracking-wider flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />Supabase</span>}
+            {isSupabaseConfigured && <span className="text-emerald-500/80 text-[10px] tracking-wider flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />Supabase</span>}
           </p>
         </div>
         <button
           onClick={openNew}
-          className="inline-flex items-center gap-2 bg-[#d4af37] text-black px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#e8cf85] hover:shadow-[0_0_24px_rgba(212,175,55,0.4)] transition-all tracking-wide"
+          className="inline-flex items-center gap-2 bg-primary text-black px-5 py-2.5 rounded-lg text-sm font-bold hover:opacity-90 hover:shadow-[0_0_24px_rgba(212,175,55,0.4)] transition-all tracking-wide"
         >
           <Plus className="h-4 w-4" /> Yeni Ürün Ekle
         </button>
@@ -196,27 +196,27 @@ function MenuManagement() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ürünlerde ara…"
-            className="w-full bg-[#0d0d0d] border border-[rgba(212,175,55,0.15)] rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#d4af37] transition-colors"
+            className="w-full bg-card border border-border rounded-lg pl-9 pr-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/60"
           />
         </div>
         <select
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
-          className="bg-[#0d0d0d] border border-[rgba(212,175,55,0.15)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#d4af37] transition-colors"
+          className="bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
         >
           <option value="all">Tüm Kategoriler</option>
-          {CATEGORY_OPTIONS.map((c) => (
+          {categoryOptions.map((c) => (
             <option key={c.id} value={c.id}>{c.title}</option>
           ))}
         </select>
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-[rgba(212,175,55,0.10)] bg-[#0d0d0d] overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-[rgba(212,175,55,0.08)]">
+              <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="px-5 py-4 font-medium">Görsel</th>
                 <th className="px-5 py-4 font-medium">Ürün</th>
                 <th className="px-5 py-4 font-medium hidden md:table-cell">Kategori</th>
@@ -229,7 +229,7 @@ function MenuManagement() {
               {filtered.map((i) => (
                 <tr
                   key={i.id}
-                  className="border-b border-white/[0.03] last:border-0 hover:bg-white/[0.015] transition-colors"
+                  className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors"
                 >
                   <td className="px-5 py-3">
                     {i.img ? (
@@ -238,30 +238,30 @@ function MenuManagement() {
                         alt={i.name}
                         loading="lazy"
                         decoding="async"
-                        className="h-12 w-12 rounded-lg object-cover border border-[rgba(212,175,55,0.12)]"
+                        className="h-12 w-12 rounded-lg object-cover border border-border"
                         width={48}
                         height={48}
                       />
                     ) : (
-                      <div className="h-12 w-12 rounded-lg bg-white/[0.03] flex items-center justify-center border border-[rgba(212,175,55,0.08)]">
+                      <div className="h-12 w-12 rounded-lg bg-muted/30 flex items-center justify-center border border-border">
                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    <div className="font-medium">{i.name}</div>
+                    <div className="font-medium text-foreground">{i.name}</div>
                     <div className="text-xs text-muted-foreground line-clamp-1 md:hidden mt-0.5">
-                      {categoryTitle(i.category)}
+                      {categoryTitle(i.category, categoryOptions)}
                     </div>
                   </td>
                   <td className="px-5 py-3 hidden md:table-cell text-muted-foreground text-xs">
-                    {categoryTitle(i.category)}
+                    {categoryTitle(i.category, categoryOptions)}
                   </td>
-                  <td className="px-5 py-3 text-[#d4af37] whitespace-nowrap font-medium">{i.price}</td>
+                  <td className="px-5 py-3 text-primary whitespace-nowrap font-medium">{i.price}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <Toggle checked={i.available} onChange={() => toggleAvail(i.id)} size="sm" />
-                      <span className={`text-xs ${i.available ? "text-emerald-300" : "text-red-300"}`}>
+                      <span className={`text-xs ${i.available ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {i.available ? "Mevcut" : "Tükendi"}
                       </span>
                     </div>
@@ -270,7 +270,7 @@ function MenuManagement() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => openEdit(i)}
-                        className="p-2 rounded-lg hover:bg-[#d4af37]/10 hover:text-[#d4af37] text-muted-foreground transition-colors"
+                        className="p-2 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"
                         aria-label="Düzenle"
                       >
                         <Pencil className="h-4 w-4" />
@@ -303,6 +303,7 @@ function MenuManagement() {
         form={drawer.form}
         saving={saving}
         saveError={saveError}
+        categoryOptions={categoryOptions}
         onClose={close}
         onChange={(form) => setDrawer((d) => ({ ...d, form }))}
         onSubmit={submit}
@@ -326,6 +327,7 @@ function ProductDrawer({
   form,
   saving,
   saveError,
+  categoryOptions,
   onClose,
   onChange,
   onSubmit,
@@ -334,6 +336,7 @@ function ProductDrawer({
   form: FormState;
   saving: boolean;
   saveError: string;
+  categoryOptions: { id: string; title: string }[];
   onClose: () => void;
   onChange: (f: FormState) => void;
   onSubmit: () => void;
@@ -371,16 +374,16 @@ function ProductDrawer({
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] bg-[#0a0a0a] border-l border-[rgba(212,175,55,0.15)] shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] bg-background border-l border-border shadow-2xl transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         } flex flex-col`}
       >
         {/* Header */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-[rgba(212,175,55,0.10)] shrink-0">
-          <h2 className="font-display text-lg">{form.id ? "Ürünü Düzenle" : "Yeni Ürün Ekle"}</h2>
+        <div className="h-16 px-6 flex items-center justify-between border-b border-border shrink-0">
+          <h2 className="font-display text-lg text-foreground">{form.id ? "Ürünü Düzenle" : "Yeni Ürün Ekle"}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            className="p-2 rounded-lg hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground"
             aria-label="Kapat"
           >
             <X className="h-5 w-5" />
@@ -389,18 +392,26 @@ function ProductDrawer({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* Turkish name + desc — must be first inputs for correct form focus order */}
+          <Field label="Ürün Adı (TR)">
+            <input value={form.name} onChange={(e) => onChange({ ...form, name: e.target.value })} placeholder="Örn. Stella Martini" className="adm-inp" autoFocus />
+          </Field>
+          <Field label="Açıklama (TR)">
+            <textarea value={form.desc} onChange={(e) => onChange({ ...form, desc: e.target.value })} rows={2} placeholder="Türkçe açıklama…" className="adm-inp resize-none" />
+          </Field>
+
           {/* Image section */}
           <div className="space-y-2">
             <div className="flex gap-2">
               <button
                 onClick={() => setImgMode("upload")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imgMode === "upload" ? "bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imgMode === "upload" ? "bg-primary/15 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Cloud className="h-3.5 w-3.5" /> Görsel Yükle
               </button>
               <button
                 onClick={() => setImgMode("url")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imgMode === "url" ? "bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imgMode === "url" ? "bg-primary/15 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Link2 className="h-3.5 w-3.5" /> URL Gir
               </button>
@@ -411,7 +422,7 @@ function ProductDrawer({
                 onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
                 onDragLeave={() => setDrag(false)}
                 onDrop={(e) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]); }}
-                className={`rounded-xl border-2 border-dashed transition-all ${drag ? "border-[#d4af37] bg-[#d4af37]/5" : "border-[rgba(212,175,55,0.2)] bg-black/30"}`}
+                className={`rounded-xl border-2 border-dashed transition-all ${drag ? "border-primary bg-primary/5" : "border-border/60 bg-muted/20"}`}
               >
                 {form.img ? (
                   <div className="p-3 flex items-center gap-3">
@@ -422,15 +433,15 @@ function ProductDrawer({
                 ) : (
                   <label className="flex flex-col items-center justify-center py-10 cursor-pointer">
                     {uploading ? (
-                      <Loader2 className="h-7 w-7 text-[#d4af37] animate-spin mb-2" />
+                      <Loader2 className="h-7 w-7 text-primary animate-spin mb-2" />
                     ) : (
-                      <UploadCloud className="h-7 w-7 text-[#d4af37] mb-2" />
+                      <UploadCloud className="h-7 w-7 text-primary mb-2" />
                     )}
-                    <div className="text-sm">
-                      {uploading ? "Yükleniyor…" : <>Sürükleyin veya <span className="text-[#d4af37] underline">göz atın</span></>}
+                    <div className="text-sm text-foreground">
+                      {uploading ? "Yükleniyor…" : <>Sürükleyin veya <span className="text-primary underline">göz atın</span></>}
                     </div>
                     {!isCloudinaryConfigured && !uploading && (
-                      <div className="text-[10px] text-amber-400 mt-1.5">Cloudinary yapılandırılmamış — base64 kullanılacak</div>
+                      <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1.5">Cloudinary yapılandırılmamış — base64 kullanılacak</div>
                     )}
                     <div className="text-xs text-muted-foreground mt-1">PNG, JPG maks 5MB</div>
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} disabled={uploading} />
@@ -459,14 +470,6 @@ function ProductDrawer({
             )}
           </div>
 
-          {/* Turkish name + desc */}
-          <Field label="Ürün Adı (TR)">
-            <input value={form.name} onChange={(e) => onChange({ ...form, name: e.target.value })} placeholder="Örn. Stella Martini" className="adm-inp" />
-          </Field>
-          <Field label="Açıklama (TR)">
-            <textarea value={form.desc} onChange={(e) => onChange({ ...form, desc: e.target.value })} rows={2} placeholder="Türkçe açıklama…" className="adm-inp resize-none" />
-          </Field>
-
           {/* BG / GR */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Ad (BG)">
@@ -481,7 +484,7 @@ function ProductDrawer({
           <div className="grid grid-cols-2 gap-3">
             <Field label="Kategori">
               <select value={form.category} onChange={(e) => onChange({ ...form, category: e.target.value })} className="adm-inp">
-                {CATEGORY_OPTIONS.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c.id} value={c.id}>{c.title}</option>
                 ))}
               </select>
@@ -502,9 +505,9 @@ function ProductDrawer({
           </Field>
 
           {/* Status toggle */}
-          <div className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.12)] bg-black/30 p-4">
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
             <div>
-              <div className="text-sm">Durum</div>
+              <div className="text-sm text-foreground">Durum</div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 {form.available ? "Menüde görünür" : "Tükendi olarak işaretli"}
               </div>
@@ -522,30 +525,32 @@ function ProductDrawer({
           <style>{`
             .adm-inp {
               width: 100%;
-              background: rgba(0,0,0,0.6);
-              border: 1px solid rgba(212,175,55,0.15);
+              background: var(--background);
+              border: 1px solid var(--border);
               border-radius: 0.5rem;
               padding: 0.5rem 0.75rem;
               font-size: 0.875rem;
               color: var(--foreground);
               transition: border-color 0.2s;
             }
-            .adm-inp:focus { outline: none; border-color: #d4af37; }
+            .adm-inp:focus { outline: none; border-color: var(--primary); }
+            .adm-inp::placeholder { color: var(--muted-foreground); opacity: 0.6; }
+            .adm-inp option { background: var(--card); color: var(--foreground); }
           `}</style>
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[rgba(212,175,55,0.10)] flex gap-3 shrink-0">
+        <div className="p-6 border-t border-border flex gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 border border-[rgba(212,175,55,0.20)] text-foreground rounded-lg py-2.5 text-sm hover:bg-white/5 transition-colors"
+            className="flex-1 border border-border text-foreground rounded-lg py-2.5 text-sm hover:bg-muted/40 transition-colors"
           >
             İptal
           </button>
           <button
             onClick={onSubmit}
             disabled={saving || uploading}
-            className="flex-1 bg-[#d4af37] text-black rounded-lg py-2.5 text-sm font-bold hover:bg-[#e8cf85] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            className="flex-1 bg-primary text-black rounded-lg py-2.5 text-sm font-bold hover:opacity-90 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {saving ? "Kaydediliyor…" : form.id ? "Kaydet" : "Ekle"}
@@ -582,15 +587,15 @@ function Confirm({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-[rgba(212,175,55,0.18)] bg-[#0d0d0d] p-6"
+        className="w-full max-w-sm rounded-2xl border border-border bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="font-display text-lg">{title}</h3>
+        <h3 className="font-display text-lg text-foreground">{title}</h3>
         <p className="text-sm text-muted-foreground mt-2">{message}</p>
         <div className="flex gap-3 mt-6">
           <button
             onClick={onCancel}
-            className="flex-1 border border-[rgba(212,175,55,0.20)] rounded-lg py-2.5 text-sm hover:bg-white/5 transition-colors"
+            className="flex-1 border border-border rounded-lg py-2.5 text-sm text-foreground hover:bg-muted/40 transition-colors"
           >
             İptal
           </button>

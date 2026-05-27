@@ -249,9 +249,9 @@ async function main() {
 
   const { data: products, error: prodErr } = await supabase
     .from('menu_items')
-    .select('id, name, category')
+    .select('id, name_tr, category')
     .order('category', { ascending: true })
-    .order('name',     { ascending: true });
+    .order('name_tr',  { ascending: true });
 
   if (prodErr) {
     console.error(`\n${C.red}Supabase error: ${prodErr.message}${C.reset}`);
@@ -292,7 +292,7 @@ async function main() {
   }));
 
   const prodJobs = products.map(p => ({
-    name:       p.name,
+    name:       p.name_tr,
     categoryId: p.category,
     outputDir:  CONFIG.outputDirs.products,
     jobType:    'product',

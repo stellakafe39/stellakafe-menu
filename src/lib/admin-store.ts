@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { categories } from "./menu-data";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
@@ -47,11 +47,16 @@ export function useAdminItems() {
 
   useEffect(() => {
     if (isSupabaseConfigured) {
+      const abortTimer = setTimeout(() => {
+        setItems(seed);
+        setLoading(false);
+      }, 10000);
       supabase
         .from("menu_items")
         .select("*")
         .order("sort_order", { ascending: true })
         .then(({ data, error }: { data: null | Array<Record<string, unknown>>; error: null | { message: string } }) => {
+          clearTimeout(abortTimer);
           if (!error && data && data.length > 0) {
             setItems(
               data.map((r) => ({
@@ -72,6 +77,11 @@ export function useAdminItems() {
           } else {
             setItems(seed);
           }
+          setLoading(false);
+        })
+        .catch(() => {
+          clearTimeout(abortTimer);
+          setItems(seed);
           setLoading(false);
         });
     } else {
@@ -188,9 +198,25 @@ export function useAdminItems() {
     [],
   );
 
-  return { items, setItems, loading, saveItem, deleteItem, toggleAvail };
+  // Yüklenen itemlardan dinamik kategori listesi türet.
+  // Supabase'deki kategori ID'leri Türkçe ise onları göster;
+  // kod'daki hardcoded ID'lerle eşleşirse o başlığı kullan.
+  const categoryOptions = useMemo<{ id: string; title: string }[]>(() => {
+    if (items.length === 0) return CATEGORY_OPTIONS;
+    const seen = new Map<string, string>();
+    items.forEach((i) => {
+      if (i.category && !seen.has(i.category)) {
+        const match = CATEGORY_OPTIONS.find((c) => c.id === i.category);
+        seen.set(i.category, match?.title ?? i.category);
+      }
+    });
+    return [...seen.entries()].map(([id, title]) => ({ id, title }));
+  }, [items]);
+
+  return { items, setItems, loading, categoryOptions, saveItem, deleteItem, toggleAvail };
 }
 
-export function categoryTitle(id: string) {
-  return CATEGORY_OPTIONS.find((c) => c.id === id)?.title ?? id;
+export function categoryTitle(id: string, options?: { id: string; title: string }[]) {
+  const list = options ?? CATEGORY_OPTIONS;
+  return list.find((c) => c.id === id)?.title ?? id;
 }
