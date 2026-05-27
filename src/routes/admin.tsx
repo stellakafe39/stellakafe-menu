@@ -64,13 +64,17 @@ function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) {
-      setError("E-posta veya şifre hatalı.");
-      setLoading(false);
-    } else {
-      onLogin(data.session);
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        setError(authError.message.includes("Invalid") ? "E-posta veya şifre hatalı." : authError.message);
+      } else {
+        onLogin(data.session);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? `Bağlantı hatası: ${err.message}` : "Bilinmeyen hata oluştu.");
     }
+    setLoading(false);
   };
 
   return (
@@ -189,7 +193,9 @@ function AdminLayout() {
     exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
 
   const handleSignOut = async () => {
-    if (isSupabaseConfigured) await supabase.auth.signOut();
+    if (isSupabaseConfigured) {
+      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+    }
     setSession(null);
   };
 

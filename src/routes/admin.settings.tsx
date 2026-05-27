@@ -69,12 +69,18 @@ function SettingsPage() {
     setSaving(true);
     setError("");
     setSaved(false);
-    if (isSupabaseConfigured) {
-      const rows = Object.entries(settings).map(([key, value]) => ({ key, value }));
-      const { error: err } = await supabase
-        .from("settings")
-        .upsert(rows, { onConflict: "key" });
-      if (err) { setError(err.message); setSaving(false); return; }
+    try {
+      if (isSupabaseConfigured) {
+        const rows = Object.entries(settings).map(([key, value]) => ({ key, value }));
+        const { error: err } = await supabase
+          .from("settings")
+          .upsert(rows, { onConflict: "key" });
+        if (err) { setError(err.message); setSaving(false); return; }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kaydetme hatası oluştu.");
+      setSaving(false);
+      return;
     }
     setSaving(false);
     setSaved(true);
