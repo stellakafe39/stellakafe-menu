@@ -16,6 +16,11 @@ dist-ssr
 .nitro
 *.local
 
+# Environment secrets — never commit
+.env
+.env.local
+.env.*.local
+
 # AI-generated images (large binaries — upload to Cloudinary instead)
 generated-images/
 

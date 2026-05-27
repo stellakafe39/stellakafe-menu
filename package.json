@@ -10,10 +10,12 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "generate:images": "node --env-file=.env generate-menu-images.js"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
+    "@google/genai": "^2.6.0",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
