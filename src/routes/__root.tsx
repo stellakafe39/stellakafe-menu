@@ -12,7 +12,7 @@ import { LanguageProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import appCss from "../styles.css?url";
 
-const SITE_URL = "https://stella-lounge-sooty.vercel.app";
+const SITE_URL = "https://stellalounge39.vercel.app";
 const SITE_NAME = "Stella Cafe & Lounge";
 const SITE_DESC =
   "Kırklareli Merkez'in en seçkin cafe ve lounge deneyimi. Premium kahve, imza içecekler, gurme lezzetler ve lüks atmosfer.";

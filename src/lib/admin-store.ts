@@ -193,7 +193,8 @@ export function useAdminItems() {
             .from("menu_items")
             .update({ available: next, updated_at: new Date().toISOString() })
             .eq("id", id)
-            .then(() => {});
+            .then(() => {})
+            .catch(() => {});
         }
         return prev.map((i) => (i.id === id ? { ...i, available: next } : i));
       });

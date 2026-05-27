@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 
-Sitemap: https://stella-lounge-sooty.vercel.app/sitemap.xml
+Sitemap: https://stellalounge39.vercel.app/sitemap.xml

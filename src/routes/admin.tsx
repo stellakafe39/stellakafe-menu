@@ -11,8 +11,10 @@ import {
   Loader2,
   Sun,
   Moon,
+  ShieldCheck,
+  Timer,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
 
@@ -27,7 +29,10 @@ const nav = [
   { to: "/admin/settings", label: "Ayarlar", icon: Settings },
 ];
 
-// ── Theme toggle (aynı Navbar'daki gibi) ─────────────────────────────────────
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 60_000; // 60 saniye kilitlenme
+
+// ── Theme Toggle ──────────────────────────────────────────────────────────────
 function AdminThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === "light";
@@ -53,81 +58,159 @@ function AdminThemeToggle() {
   );
 }
 
-// ── Login Screen ─────────────────────────────────────────────────────────────
+// ── Login Screen ──────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }: { onLogin: (session: unknown) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [attempts, setAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [tick, setTick] = useState(0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Geri sayım için her saniye güncelle
+  useEffect(() => {
+    if (lockedUntil <= 0) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
+
+  const remaining = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+  const locked = remaining > 0;
+
+  // Kilitlenme süresi bitince state temizle
+  useEffect(() => {
+    if (lockedUntil > 0 && remaining === 0) {
+      setLockedUntil(0);
+      setAttempts(0);
+      setError("");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (locked || loading) return;
     setLoading(true);
     setError("");
+
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
       if (authError) {
-        setError(authError.message.includes("Invalid") ? "E-posta veya şifre hatalı." : authError.message);
+        const next = attempts + 1;
+        setAttempts(next);
+        if (next >= MAX_ATTEMPTS) {
+          setLockedUntil(Date.now() + LOCKOUT_MS);
+          setError(`Çok fazla hatalı deneme. ${LOCKOUT_MS / 1000} saniye bekleyin.`);
+        } else {
+          const left = MAX_ATTEMPTS - next;
+          setError(
+            authError.message.toLowerCase().includes("invalid")
+              ? `E-posta veya şifre hatalı. (${left} deneme hakkı kaldı)`
+              : authError.message,
+          );
+        }
       } else {
+        setAttempts(0);
         onLogin(data.session);
       }
     } catch (err) {
-      setError(err instanceof Error ? `Bağlantı hatası: ${err.message}` : "Bilinmeyen hata oluştu.");
+      setError(
+        err instanceof Error
+          ? `Bağlantı hatası: ${err.message}`
+          : "Bağlantı kurulamadı. Lütfen tekrar deneyin.",
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [email, password, attempts, locked, loading, onLogin]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm animate-fade-up">
+        {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <img src="/stella-logo.png" alt="Stella Cafe & Lounge" className="h-14 w-auto object-contain mb-4 opacity-90" loading="eager" />
+          <img
+            src="/stella-logo.png"
+            alt="Stella Cafe & Lounge"
+            className="h-16 w-auto object-contain mb-4 opacity-90"
+            loading="eager"
+          />
           <p className="text-[9px] tracking-[0.5em] uppercase text-muted-foreground">Admin Panel</p>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-8 shadow-xl">
-          <h1 className="font-display text-2xl text-foreground mb-1">Giriş Yap</h1>
-          <p className="text-xs text-muted-foreground mb-7">Devam etmek için kimliğinizi doğrulayın.</p>
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/20">
+          <div className="flex items-center gap-2.5 mb-6">
+            <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+            <div>
+              <h1 className="font-display text-xl text-foreground leading-tight">Güvenli Giriş</h1>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Yalnızca yetkili erişim.</p>
+            </div>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <label className="block">
-              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">E-posta</span>
+              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+                E-posta
+              </span>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={locked}
                 autoComplete="email"
-                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                autoFocus
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/40 disabled:opacity-50"
+                placeholder="admin@example.com"
               />
             </label>
 
             <label className="block">
-              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Şifre</span>
+              <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+                Şifre
+              </span>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={locked}
                 autoComplete="current-password"
-                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
               />
             </label>
 
             {error && (
-              <div className="flex items-center gap-2 text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                {error}
+              <div className="flex items-start gap-2 text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {locked && (
+              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                <Timer className="h-3.5 w-3.5 shrink-0" />
+                <span>Giriş kilitlendi — {remaining}s sonra tekrar deneyin</span>
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full mt-2 bg-primary text-black font-bold tracking-[0.2em] text-[11px] uppercase rounded-lg py-3 hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+              disabled={loading || locked || !email || !password}
+              className="w-full mt-2 bg-primary text-black font-bold tracking-[0.18em] text-[11px] uppercase rounded-lg py-3 hover:opacity-90 transition-all hover:shadow-[0_0_20px_rgba(212,175,55,0.35)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
+              {loading ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Doğrulanıyor…</>
+              ) : locked ? (
+                <><Timer className="h-4 w-4" /> Kilitli ({remaining}s)</>
+              ) : (
+                "Giriş Yap"
+              )}
             </button>
           </form>
         </div>
@@ -161,31 +244,62 @@ function AdminLayout() {
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [session, setSession] = useState<any>(null);
-  const [checking, setChecking] = useState(isSupabaseConfigured);
+  const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    let done = false;
-    // 4 saniye içinde cevap gelmezse login ekranını göster
+
+    let cancelled = false;
+
+    // 5 saniye içinde cevap gelmezse login ekranını göster
     const timer = setTimeout(() => {
-      if (!done) { done = true; setChecking(false); }
-    }, 4000);
-    supabase.auth.getSession()
+      if (!cancelled) setAuthChecked(true);
+    }, 5000);
+
+    supabase.auth
+      .getSession()
       .then(({ data }: { data: { session: unknown } }) => {
-        if (!done) { done = true; clearTimeout(timer); setSession(data.session); setChecking(false); }
+        if (!cancelled) {
+          clearTimeout(timer);
+          setSession(data.session ?? null);
+          setAuthChecked(true);
+        }
       })
-      .catch(() => { if (!done) { done = true; clearTimeout(timer); setChecking(false); } });
-    // Sadece anlamlı auth event'leri dinle — INITIAL_SESSION / TOKEN_REFRESHED gibi
-    // arka plan event'leri state'i bozmamalı
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event: string, s: unknown) => {
-        if (event === "SIGNED_IN" || event === "SIGNED_OUT") setSession(s);
-      },
-    );
-    return () => { clearTimeout(timer); subscription.unsubscribe(); };
+      .catch(() => {
+        if (!cancelled) {
+          clearTimeout(timer);
+          setAuthChecked(true);
+        }
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event: string, s: unknown) => {
+      if (!cancelled && (event === "SIGNED_IN" || event === "SIGNED_OUT")) {
+        setSession(s ?? null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  if (isSupabaseConfigured && !checking && !session) {
+  // Auth kontrol ediliyor
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <img src="/stella-logo.png" alt="Stella" className="h-12 w-auto opacity-60" loading="eager" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
+        <p className="text-xs text-muted-foreground/50 tracking-widest uppercase">Doğrulanıyor…</p>
+      </div>
+    );
+  }
+
+  // Login ekranı
+  if (isSupabaseConfigured && !session) {
     return <LoginScreen onLogin={(s) => setSession(s)} />;
   }
 
@@ -207,7 +321,6 @@ function AdminLayout() {
           open ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0 bg-card border-r border-border flex flex-col`}
       >
-        {/* Gold accent line */}
         <div className="h-px w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
 
         <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
@@ -233,7 +346,9 @@ function AdminLayout() {
               >
                 <Icon className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-primary" : "group-hover:text-foreground"}`} />
                 <span className={active ? "font-medium" : ""}>{n.label}</span>
-                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(212,175,55,0.8)]" />}
+                {active && (
+                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(212,175,55,0.8)]" />
+                )}
               </Link>
             );
           })}
@@ -259,13 +374,21 @@ function AdminLayout() {
           )}
           <div className="px-3 pt-2 pb-1">
             <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/15 to-transparent mb-2" />
-            <p className="text-[10px] text-muted-foreground/35">v1.0 · Şirket içi kullanım</p>
+            <div className="flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full ${isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <p className="text-[10px] text-muted-foreground/40">
+                {isSupabaseConfigured ? "Veritabanı bağlı" : "Geliştirme modu"}
+              </p>
+            </div>
           </div>
         </div>
       </aside>
 
       {open && (
-        <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setOpen(false)} />
+        <div
+          className="fixed inset-0 z-30 bg-black/70 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
       )}
 
       {/* ── Main ── */}
@@ -276,12 +399,13 @@ function AdminLayout() {
           <button
             onClick={() => setOpen((v) => !v)}
             className="lg:hidden p-2 rounded-lg hover:bg-muted/50 transition-colors"
-            aria-label="Menüyü aç"
+            aria-label="Menüyü aç/kapat"
           >
             {open ? <X className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
           </button>
           <div className="font-display text-base tracking-[0.25em] text-muted-foreground/60 select-none">
-            Stella <span className="text-primary/80">·</span> <span className="text-primary font-medium">Admin</span>
+            Stella <span className="text-primary/80">·</span>{" "}
+            <span className="text-primary font-medium">Admin</span>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 tracking-wider">
@@ -298,13 +422,7 @@ function AdminLayout() {
         </header>
 
         <main className="flex-1 p-4 lg:p-8 overflow-x-hidden overflow-y-auto">
-          {checking ? (
-            <div className="flex items-center justify-center py-24">
-              <Loader2 className="h-6 w-6 text-primary animate-spin" />
-            </div>
-          ) : (
-            <Outlet />
-          )}
+          <Outlet />
         </main>
       </div>
     </div>

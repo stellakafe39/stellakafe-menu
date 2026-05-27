@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:title", content: "Stella Cafe & Lounge — Kırklareli" },
       { property: "og:description", content: "Kırklareli'nin en seçkin cafe ve lounge deneyimi." },
-      { property: "og:url", content: "https://stella-lounge-sooty.vercel.app/" },
+      { property: "og:url", content: "https://stellalounge39.vercel.app/" },
     ],
     links: [
       { rel: "preload", as: "image", href: heroImg },
