@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useTransition, memo, useMemo } from "react";
 import { categories, type Item } from "@/lib/menu-data";
-import { useAdminItems, type AdminItem } from "@/lib/admin-store";
+import { useAdminItems } from "@/lib/admin-store";
 import { useLanguage } from "@/lib/i18n";
 import { Navbar } from "@/components/Navbar";
 import {
@@ -46,16 +46,6 @@ export const Route = createFileRoute("/menu")({
   }),
 });
 
-function slugify(text: string): string {
-  const TR: Record<string, string> = {
-    ğ:'g',Ğ:'g',ü:'u',Ü:'u',ş:'s',Ş:'s',
-    ı:'i',İ:'i',ö:'o',Ö:'o',ç:'c',Ç:'c',
-    â:'a',Â:'a',î:'i',Î:'i',û:'u',Û:'u',
-  };
-  return text.split('').map(c=>TR[c]??c).join('')
-    .toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim()
-    .replace(/[\s_]+/g,'-').replace(/-{2,}/g,'-');
-}
 
 const catBg: Record<string, string> = {
   snacks:          r1Img,
@@ -104,46 +94,71 @@ function MenuPage() {
   const { language } = useLanguage();
   const { items: dbItems } = useAdminItems();
 
-  // Build category structure with live DB images; fall back to static data while loading
+  // name-based img lookup: works regardless of how DB organises categories
   const liveCategories = useMemo(() => {
     if (!dbItems.length) return categories;
 
-    const grouped = new Map<string, AdminItem[]>();
+    // Build lowercase name → img_url map from all DB items
+    const imgByName = new Map<string, string>();
     for (const item of dbItems) {
-      if (!item.available) continue;
-      if (!grouped.has(item.category)) grouped.set(item.category, []);
-      grouped.get(item.category)!.push(item);
+      if (item.img) imgByName.set(item.name.toLowerCase().trim(), item.img);
     }
 
-    return categories.map(staticCat => {
-      // DB may store category as English ID ("snacks") or Turkish title ("Atıştırmalıklar")
-      const catItems =
-        grouped.get(staticCat.id) ??
-        grouped.get(staticCat.title.TR) ??
-        [];
-      if (!catItems.length) return staticCat;
-      return {
-        ...staticCat,
-        items: catItems.map((i): Item => ({
-          name: { TR: i.name, BG: i.name_bg || i.name, GR: i.name_gr || i.name },
-          desc: { TR: i.desc, BG: i.desc_bg || i.desc, GR: i.desc_gr || i.desc },
-          price: i.price,
-          img: i.img,
-        })),
-      };
-    });
+    const resolveImg = (staticName: string, fallback: string): string => {
+      const lower = staticName.toLowerCase().trim();
+      // 1. Exact match
+      if (imgByName.has(lower)) return imgByName.get(lower)!;
+      // 2. Strip "+ Patates" suffix (e.g. "Kaşarlı Tost + Patates" → "Kaşarlı Tost")
+      const stripped = lower.replace(/\s*\+\s*patates\b/i, '').trim();
+      if (imgByName.has(stripped)) return imgByName.get(stripped)!;
+      // 3. DB name is a prefix of the static name
+      for (const [dbName, img] of imgByName) {
+        if (lower.startsWith(dbName + ' ') || lower === dbName) return img;
+      }
+      return fallback;
+    };
+
+    return categories.map(staticCat => ({
+      ...staticCat,
+      items: staticCat.items.map(item => ({
+        ...item,
+        img: resolveImg(item.name.TR, item.img),
+      })),
+    }));
   }, [dbItems]);
 
-  // Storage URLs for AI-generated category backgrounds (falls back to local asset on error)
+  // Hardcoded map from static category ID → actual Storage slug (derived from DB category names)
+  const CAT_STORAGE_SLUG: Record<string, string> = {
+    snacks:          'atistirmaliklar',
+    toasts_burgers:  'tostlar-ve-burgerler',
+    pasta_pizzas:    'pizzalar',
+    main_courses:    'etler-ve-izgaralar',
+    salads:          'salatalar',
+    breakfast_soups: 'corbalar-kahvalti',
+    desserts:        'tatlilar',
+    hot_drinks:      'sicak-icecekler',
+    turkish_coffee:  'kahveler',
+    espresso:        'kahveler',
+    hot_choco:       'sicak-cikolatalar',
+    cold_coffee:     'soguk-icecekler',
+    frappe:          'soguk-icecekler',
+    cold_drinks:     'soguk-icecekler',
+    cocktails:       'soguk-icecekler',
+    shisha:          '',
+  };
+
   const catStorageUrls = useMemo(() =>
     SUPABASE_URL
       ? Object.fromEntries(
           categories.map(c => [
             c.id,
-            `${SUPABASE_URL}/storage/v1/object/public/menu-images/categories/${slugify(c.title.TR)}.jpg`,
+            CAT_STORAGE_SLUG[c.id]
+              ? `${SUPABASE_URL}/storage/v1/object/public/menu-images/categories/${CAT_STORAGE_SLUG[c.id]}.jpg`
+              : '',
           ])
         )
       : {} as Record<string, string>,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
