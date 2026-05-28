@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useTransition, memo } from "react";
+import { useState, useTransition, memo, useMemo } from "react";
 import { categories, type Item } from "@/lib/menu-data";
+import { useAdminItems, type AdminItem } from "@/lib/admin-store";
 import { useLanguage } from "@/lib/i18n";
 import { Navbar } from "@/components/Navbar";
 import {
@@ -45,6 +46,17 @@ export const Route = createFileRoute("/menu")({
   }),
 });
 
+function slugify(text: string): string {
+  const TR: Record<string, string> = {
+    ğ:'g',Ğ:'g',ü:'u',Ü:'u',ş:'s',Ş:'s',
+    ı:'i',İ:'i',ö:'o',Ö:'o',ç:'c',Ç:'c',
+    â:'a',Â:'a',î:'i',Î:'i',û:'u',Û:'u',
+  };
+  return text.split('').map(c=>TR[c]??c).join('')
+    .toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim()
+    .replace(/[\s_]+/g,'-').replace(/-{2,}/g,'-');
+}
+
 const catBg: Record<string, string> = {
   snacks:          r1Img,
   toasts_burgers:  r2Img,
@@ -83,17 +95,63 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
   shisha:          ShishaIcon,
 };
 
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const { language } = useLanguage();
+  const { items: dbItems } = useAdminItems();
+
+  // Build category structure with live DB images; fall back to static data while loading
+  const liveCategories = useMemo(() => {
+    if (!dbItems.length) return categories;
+
+    const grouped = new Map<string, AdminItem[]>();
+    for (const item of dbItems) {
+      if (!item.available) continue;
+      if (!grouped.has(item.category)) grouped.set(item.category, []);
+      grouped.get(item.category)!.push(item);
+    }
+
+    return categories.map(staticCat => {
+      // DB may store category as English ID ("snacks") or Turkish title ("Atıştırmalıklar")
+      const catItems =
+        grouped.get(staticCat.id) ??
+        grouped.get(staticCat.title.TR) ??
+        [];
+      if (!catItems.length) return staticCat;
+      return {
+        ...staticCat,
+        items: catItems.map((i): Item => ({
+          name: { TR: i.name, BG: i.name_bg || i.name, GR: i.name_gr || i.name },
+          desc: { TR: i.desc, BG: i.desc_bg || i.desc, GR: i.desc_gr || i.desc },
+          price: i.price,
+          img: i.img,
+        })),
+      };
+    });
+  }, [dbItems]);
+
+  // Storage URLs for AI-generated category backgrounds (falls back to local asset on error)
+  const catStorageUrls = useMemo(() =>
+    SUPABASE_URL
+      ? Object.fromEntries(
+          categories.map(c => [
+            c.id,
+            `${SUPABASE_URL}/storage/v1/object/public/menu-images/categories/${slugify(c.title.TR)}.jpg`,
+          ])
+        )
+      : {} as Record<string, string>,
+    [],
+  );
 
   const handleSetCat = (id: string | null) => {
     startTransition(() => setActiveCatId(id));
   };
 
-  const activeCat = categories.find((c) => c.id === activeCatId);
+  const activeCat = liveCategories.find((c) => c.id === activeCatId);
 
   return (
     <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
@@ -113,9 +171,10 @@ function MenuPage() {
             style={{ animationDelay: "0.1s" }}
           >
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-              {categories.map((cat, i) => {
+              {liveCategories.map((cat, i) => {
                 const Icon = iconFor[cat.id] ?? PlateIcon;
-                const bg = catBg[cat.id] ?? heroImg;
+                const fallbackBg = catBg[cat.id] ?? heroImg;
+                const storageBg = catStorageUrls[cat.id] ?? '';
                 const title = cat.title?.[language] || cat.title?.["TR"];
 
                 return (
@@ -127,7 +186,8 @@ function MenuPage() {
                     aria-label={title}
                   >
                     <img
-                      src={bg}
+                      src={storageBg || fallbackBg}
+                      onError={(e) => { const el = e.target as HTMLImageElement; if (el.src !== fallbackBg) el.src = fallbackBg; }}
                       alt={title}
                       loading="lazy"
                       decoding="async"
@@ -172,9 +232,10 @@ function MenuPage() {
 
               {/* Mini image cards */}
               <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                {categories.map((cat) => {
+                {liveCategories.map((cat) => {
                   const active = activeCatId === cat.id;
-                  const bg = catBg[cat.id] ?? heroImg;
+                  const fallbackBg = catBg[cat.id] ?? heroImg;
+                  const storageBg = catStorageUrls[cat.id] ?? '';
                   const Icon = iconFor[cat.id] ?? PlateIcon;
                   const title = cat.title?.[language] || cat.title?.["TR"];
                   return (
@@ -190,7 +251,8 @@ function MenuPage() {
                       style={{ width: 54, height: 70 }}
                     >
                       <img
-                        src={bg}
+                        src={storageBg || fallbackBg}
+                        onError={(e) => { const el = e.target as HTMLImageElement; if (el.src !== fallbackBg) el.src = fallbackBg; }}
                         alt=""
                         className="absolute inset-0 h-full w-full object-cover"
                         loading="lazy"
