@@ -87,6 +87,18 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
 
+// 1 EUR = EUR_RATE TRY — update when the rate changes significantly
+const EUR_RATE = 37;
+
+function buildEurStr(price: string): string {
+  const nums = [...price.matchAll(/\d+/g)].map(m => parseInt(m[0], 10));
+  if (!nums.length) return '';
+  const eurs = nums.map(n => Math.ceil(n / EUR_RATE));
+  return eurs.length === 1
+    ? `~${eurs[0]} €`
+    : `~${eurs[0]}-${eurs[eurs.length - 1]} €`;
+}
+
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -352,9 +364,12 @@ function MenuPage() {
                   <h2 className="font-display text-2xl sm:text-3xl font-light text-foreground leading-tight">
                     {selectedItem.name[language] || selectedItem.name["TR"]}
                   </h2>
-                  <span className="font-sans text-xl font-bold text-primary whitespace-nowrap mt-1 shrink-0">
-                    {selectedItem.price}
-                  </span>
+                  <PriceDisplay
+                    price={selectedItem.price}
+                    language={language}
+                    priceClass="font-sans text-xl font-bold text-primary mt-1"
+                    eurClass="text-sm"
+                  />
                 </div>
                 <p className="font-sans text-sm text-muted-foreground leading-relaxed">
                   {selectedItem.desc[language] || selectedItem.desc["TR"]}
@@ -370,6 +385,27 @@ function MenuPage() {
         </DrawerContent>
       </Drawer>
     </main>
+  );
+}
+
+function PriceDisplay({
+  price, language, priceClass, eurClass,
+}: {
+  price: string;
+  language: string;
+  priceClass: string;
+  eurClass: string;
+}) {
+  const eur = (language === 'BG' || language === 'GR') ? buildEurStr(price) : '';
+  return (
+    <span className={`flex flex-col items-end shrink-0 ${priceClass}`}>
+      <span className="whitespace-nowrap">{price}</span>
+      {eur && (
+        <span className={`whitespace-nowrap font-normal text-muted-foreground ${eurClass}`}>
+          {eur}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -414,9 +450,12 @@ const ProductCard = memo(function ProductCard({
           <h3 className="font-sans text-sm sm:text-[15px] font-semibold text-foreground leading-snug line-clamp-2">
             {name}
           </h3>
-          <span className="font-sans text-sm font-bold text-primary whitespace-nowrap mt-px shrink-0">
-            {item.price}
-          </span>
+          <PriceDisplay
+            price={item.price}
+            language={language}
+            priceClass="font-sans text-sm font-bold text-primary mt-px"
+            eurClass="text-[10px]"
+          />
         </div>
         <div className="h-px w-full bg-border/50 mb-2" />
         <p className="font-sans text-xs text-muted-foreground leading-relaxed line-clamp-2">

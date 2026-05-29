@@ -26,7 +26,7 @@ const translations: Record<Language, Record<string, string>> = {
     "home.reservations": "Резервации",
     currency: "TL",
     back: "Назад",
-    "prices.info": "Цените са в турски лири · Обслужването е включено",
+    "prices.info": "Цените са в турски лири · Приблизителната стойност в евро е посочена ориентировъчно · Обслужването е включено",
   },
   GR: {
     "menu.title": "Μενού",
@@ -35,7 +35,7 @@ const translations: Record<Language, Record<string, string>> = {
     "home.reservations": "Κρατήσεις",
     currency: "TL",
     back: "Πίσω",
-    "prices.info": "Οι τιμές είναι σε Τουρκικές Λίρες · Περιλαμβάνεται η εξυπηρέτηση",
+    "prices.info": "Οι τιμές είναι σε Τουρκικές Λίρες · Η αντίστοιχη τιμή σε Ευρώ αναγράφεται ενδεικτικά · Περιλαμβάνεται η εξυπηρέτηση",
   },
 };
 
