@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useTransition, memo, useMemo } from "react";
+import { useState, useTransition, memo, useMemo, useEffect } from "react";
 import { categories, type Item } from "@/lib/menu-data";
 import { useAdminItems } from "@/lib/admin-store";
 import { useLanguage } from "@/lib/i18n";
@@ -87,16 +87,32 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
 
-// 1 EUR = EUR_RATE TRY — update when the rate changes significantly
-const EUR_RATE = 37;
+// Fallback rate used until the live fetch resolves (or if it fails)
+const EUR_RATE_FALLBACK = 37;
 
-function buildEurStr(price: string): string {
+function buildEurStr(price: string, rate: number): string {
   const nums = [...price.matchAll(/\d+/g)].map(m => parseInt(m[0], 10));
   if (!nums.length) return '';
-  const eurs = nums.map(n => Math.ceil(n / EUR_RATE));
+  const eurs = nums.map(n => Math.ceil(n / rate));
   return eurs.length === 1
     ? `~${eurs[0]} €`
     : `~${eurs[0]}-${eurs[eurs.length - 1]} €`;
+}
+
+// Fetches live EUR/TRY rate from Frankfurter (free, no API key).
+// Returns fallback immediately; updates silently when response arrives.
+function useEurRate(): number {
+  const [rate, setRate] = useState(EUR_RATE_FALLBACK);
+  useEffect(() => {
+    fetch('https://api.frankfurter.app/latest?from=EUR&to=TRY')
+      .then(r => r.json())
+      .then((data: { rates?: { TRY?: number } }) => {
+        const live = data?.rates?.TRY;
+        if (live && live > 0) setRate(live);
+      })
+      .catch(() => { /* silent — fallback rate stays */ });
+  }, []);
+  return rate;
 }
 
 function MenuPage() {
@@ -105,6 +121,7 @@ function MenuPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const { language } = useLanguage();
   const { items: dbItems } = useAdminItems();
+  const eurRate = useEurRate();
 
   // name-based img lookup: works regardless of how DB organises categories
   const liveCategories = useMemo(() => {
@@ -329,6 +346,7 @@ function MenuPage() {
                   key={i}
                   item={item}
                   language={language}
+                  rate={eurRate}
                   onClick={() => setSelectedItem(item)}
                 />
               ))}
@@ -367,6 +385,7 @@ function MenuPage() {
                   <PriceDisplay
                     price={selectedItem.price}
                     language={language}
+                    rate={eurRate}
                     priceClass="font-sans text-xl font-bold text-primary mt-1"
                     eurClass="text-sm"
                   />
@@ -389,14 +408,15 @@ function MenuPage() {
 }
 
 function PriceDisplay({
-  price, language, priceClass, eurClass,
+  price, language, rate, priceClass, eurClass,
 }: {
   price: string;
   language: string;
+  rate: number;
   priceClass: string;
   eurClass: string;
 }) {
-  const eur = (language === 'BG' || language === 'GR') ? buildEurStr(price) : '';
+  const eur = (language === 'BG' || language === 'GR') ? buildEurStr(price, rate) : '';
   return (
     <span className={`flex flex-col items-end shrink-0 ${priceClass}`}>
       <span className="whitespace-nowrap">{price}</span>
@@ -413,10 +433,12 @@ function PriceDisplay({
 const ProductCard = memo(function ProductCard({
   item,
   language,
+  rate,
   onClick,
 }: {
   item: Item;
   language: string;
+  rate: number;
   onClick: () => void;
 }) {
   const name = item.name[language] || item.name["TR"];
@@ -453,6 +475,7 @@ const ProductCard = memo(function ProductCard({
           <PriceDisplay
             price={item.price}
             language={language}
+            rate={rate}
             priceClass="font-sans text-sm font-bold text-primary mt-px"
             eurClass="text-[10px]"
           />
