@@ -17,7 +17,7 @@ import {
 import { Footer } from "@/components/Footer";
 import { X } from "lucide-react";
 
-// Asset images for category card backgrounds
+// Asset images for category card backgrounds (also used as product-image fallbacks)
 import c1Img from "@/assets/c1.jpg";
 import c2Img from "@/assets/c2.jpg";
 import d1Img from "@/assets/d1.jpg";
@@ -106,42 +106,12 @@ const CAT_STORAGE_SLUG: Record<string, string> = {
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
 
-const EUR_RATE_FALLBACK = 37;
-
-function buildEurStr(price: string, rate: number): string {
-  const nums = [...price.matchAll(/\d+/g)].map(m => parseInt(m[0], 10));
-  if (!nums.length) return '';
-  const eurs = nums.map(n => Math.ceil(n / rate));
-  return eurs.length === 1
-    ? `~${eurs[0]} €`
-    : `~${eurs[0]}-${eurs[eurs.length - 1]} €`;
-}
-
-function useEurRate(): number {
-  const [rate, setRate] = useState(EUR_RATE_FALLBACK);
-  useEffect(() => {
-    let active = true;
-    fetch('https://api.frankfurter.app/latest?from=EUR&to=TRY')
-      .then(r => r.json())
-      .then((data: { rates?: { TRY?: number } }) => {
-        if (!active) return;
-        const live = data?.rates?.TRY;
-        if (live && live > 0) setRate(live);
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, []);
-  return rate;
-}
-
 // ── Custom BottomSheet ──────────────────────────────────────────────────────
 // Replaces vaul Drawer. vaul v1.1.2 + React 19 caused infinite render loops
 // when using a controlled `open` prop derived from non-boolean state.
-// This implementation uses createPortal + CSS transitions + native touch events.
 //
-// `mounted` guard is required: vite.config.ts runs TanStack Start in SSR mode
-// (dev server). createPortal(content, document.body) is evaluated during server
-// render where `document` is undefined → ReferenceError → page crash.
+// `mounted` guard: vite.config.ts runs TanStack Start in SSR mode (dev server).
+// createPortal(content, document.body) throws ReferenceError on the server.
 // The guard defers portal creation until the component has mounted client-side.
 interface BottomSheetProps {
   open: boolean;
@@ -155,7 +125,6 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
   const startYRef = useRef<number | null>(null);
   const dragYRef = useRef<number>(0);
 
-  // Mount guard: defer portal to client-side only (SSR safety)
   useEffect(() => { setMounted(true); }, []);
 
   // Body scroll lock
@@ -192,9 +161,7 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
     if (!sheetRef.current) return;
     sheetRef.current.style.transition = '';
     sheetRef.current.style.transform = '';
-    if (dragYRef.current > 100) {
-      onClose();
-    }
+    if (dragYRef.current > 100) onClose();
     startYRef.current = null;
     dragYRef.current = 0;
   };
@@ -207,12 +174,10 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
       aria-modal="true"
       className={`fixed inset-0 z-[200] ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
-      {/* Backdrop */}
       <div
         className={`absolute inset-0 bg-black/80 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
       />
-      {/* Sheet */}
       <div
         ref={sheetRef}
         className={`absolute inset-x-0 bottom-0 bg-card border-t border-border/40 rounded-t-[10px] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
@@ -220,7 +185,6 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Drag handle */}
         <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
         {children}
       </div>
@@ -232,12 +196,10 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  // isOpen drives the BottomSheet animation; displayItem holds content during close animation
   const [isOpen, setIsOpen] = useState(false);
   const [displayItem, setDisplayItem] = useState<Item | null>(null);
   const { language } = useLanguage();
   const { items: dbItems } = useAdminItems();
-  const eurRate = useEurRate();
 
   const openItem = useCallback((item: Item) => {
     setDisplayItem(item);
@@ -246,7 +208,6 @@ function MenuPage() {
 
   const closeItem = useCallback(() => {
     setIsOpen(false);
-    // Keep displayItem populated until close animation finishes (300ms) to prevent flash
     setTimeout(() => setDisplayItem(null), 350);
   }, []);
 
@@ -298,6 +259,8 @@ function MenuPage() {
   }, []);
 
   const activeCat = liveCategories.find((c) => c.id === activeCatId);
+  // Category-level local asset used as fallback for product images in this category
+  const activeCatFallback = (activeCatId ? catBg[activeCatId] : null) ?? heroImg;
 
   return (
     <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
@@ -439,8 +402,8 @@ function MenuPage() {
                   key={i}
                   item={item}
                   language={language}
-                  rate={eurRate}
                   onSelect={openItem}
+                  fallbackImg={activeCatFallback}
                 />
               ))}
             </ul>
@@ -449,7 +412,7 @@ function MenuPage() {
         </div>
       )}
 
-      {/* ── Custom BottomSheet — vaul replaced due to React 19 render-loop bug ── */}
+      {/* ── Custom BottomSheet — replaces vaul (React 19 render-loop fix) ── */}
       <BottomSheet open={isOpen} onClose={closeItem}>
         {displayItem && (
           <div className="mx-auto w-full max-w-md pb-8">
@@ -459,6 +422,10 @@ function MenuPage() {
                 alt={displayItem.name[language] || displayItem.name["TR"]}
                 className="w-full h-full object-cover"
                 decoding="async"
+                onError={(e) => {
+                  const el = e.target as HTMLImageElement;
+                  if (el.src !== activeCatFallback) el.src = activeCatFallback;
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
               <button
@@ -475,13 +442,9 @@ function MenuPage() {
                 <h2 className="font-display text-2xl sm:text-3xl font-light text-foreground leading-tight">
                   {displayItem.name[language] || displayItem.name["TR"]}
                 </h2>
-                <PriceDisplay
-                  price={displayItem.price}
-                  language={language}
-                  rate={eurRate}
-                  priceClass="font-sans text-xl font-bold text-primary mt-1"
-                  eurClass="text-sm"
-                />
+                <span className="font-sans text-xl font-bold text-primary mt-1 shrink-0 whitespace-nowrap">
+                  {displayItem.price}
+                </span>
               </div>
               <p className="font-sans text-sm text-muted-foreground leading-relaxed">
                 {displayItem.desc[language] || displayItem.desc["TR"]}
@@ -502,40 +465,18 @@ function MenuPage() {
   );
 }
 
-function PriceDisplay({
-  price, language, rate, priceClass, eurClass,
-}: {
-  price: string;
-  language: string;
-  rate: number;
-  priceClass: string;
-  eurClass: string;
-}) {
-  const eur = (language === 'BG' || language === 'GR') ? buildEurStr(price, rate) : '';
-  return (
-    <span className={`flex flex-col items-end shrink-0 ${priceClass}`}>
-      <span className="whitespace-nowrap">{price}</span>
-      {eur && (
-        <span className={`whitespace-nowrap font-normal text-muted-foreground ${eurClass}`}>
-          {eur}
-        </span>
-      )}
-    </span>
-  );
-}
-
-// Accepts stable `onSelect` setter — memo now correctly skips re-renders
-// when only unrelated state (isOpen, etc.) changes in the parent
+// Accepts stable `onSelect` + `fallbackImg` props.
+// memo skips re-renders when only sheet state (isOpen/displayItem) changes in parent.
 const ProductCard = memo(function ProductCard({
   item,
   language,
-  rate,
   onSelect,
+  fallbackImg,
 }: {
   item: Item;
   language: string;
-  rate: number;
   onSelect: (item: Item) => void;
+  fallbackImg: string;
 }) {
   const name = item.name[language] || item.name["TR"];
 
@@ -547,7 +488,7 @@ const ProductCard = memo(function ProductCard({
       onClick={() => onSelect(item)}
       onKeyDown={(e) => e.key === "Enter" && onSelect(item)}
     >
-      {/* Image */}
+      {/* Image — onError falls back to the category's local asset */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
         <img
           src={item.img}
@@ -555,22 +496,22 @@ const ProductCard = memo(function ProductCard({
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          onError={(e) => {
+            const el = e.target as HTMLImageElement;
+            if (el.src !== fallbackImg) el.src = fallbackImg;
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
       </div>
 
       {/* Info */}
-      <div className="flex flex-col gap-1 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-2 px-3 py-2.5">
         <h3 className="font-sans text-[13px] sm:text-sm font-semibold text-foreground leading-snug line-clamp-2">
           {name}
         </h3>
-        <PriceDisplay
-          price={item.price}
-          language={language}
-          rate={rate}
-          priceClass="font-sans text-sm font-bold text-primary"
-          eurClass="text-[10px]"
-        />
+        <span className="font-sans text-sm font-bold text-primary shrink-0 whitespace-nowrap">
+          {item.price}
+        </span>
       </div>
     </li>
   );

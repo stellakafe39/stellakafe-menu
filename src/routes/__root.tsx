@@ -112,13 +112,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
     ],
     scripts: [
+      // Primary LocalBusiness schema — multi-type for cafe + lounge + restaurant
       {
         type: "application/ld+json",
         children: JSON.stringify({
           "@context": "https://schema.org",
-          "@type": "Restaurant",
+          "@type": ["Restaurant", "CafeOrCoffeeShop", "BarOrPub"],
           name: SITE_NAME,
+          alternateName: "Stella Lounge",
+          description: SITE_DESC,
           image: `${SITE_URL}/stella-logo.png`,
+          logo: `${SITE_URL}/stella-logo.png`,
           url: SITE_URL,
           telephone: "+90 555 000 0000",
           address: {
@@ -148,10 +152,49 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
               closes: "02:00",
             },
           ],
-          servesCuisine: ["Turkish", "Italian", "International"],
+          servesCuisine: ["Turkish Cuisine", "Italian", "International", "Coffee", "Cocktails"],
           priceRange: "₺₺",
           hasMenu: `${SITE_URL}/menu`,
+          currenciesAccepted: "TRY",
+          paymentAccepted: "Cash, Credit Card",
+          amenityFeature: [
+            { "@type": "LocationFeatureSpecification", name: "Nargile / Hookah", value: true },
+            { "@type": "LocationFeatureSpecification", name: "Outdoor Seating", value: true },
+            { "@type": "LocationFeatureSpecification", name: "WiFi", value: true },
+            { "@type": "LocationFeatureSpecification", name: "Reservations", value: true },
+            { "@type": "LocationFeatureSpecification", name: "Takeaway", value: false },
+          ],
+          hasOfferCatalog: {
+            "@type": "OfferCatalog",
+            name: "Stella Lounge Menü",
+            itemListElement: [
+              { "@type": "OfferCatalog", name: "Kahve & Sıcak İçecekler" },
+              { "@type": "OfferCatalog", name: "Soğuk İçecekler & Kokteyller" },
+              { "@type": "OfferCatalog", name: "Yiyecekler & Atıştırmalıklar" },
+              { "@type": "OfferCatalog", name: "Tatlılar" },
+              { "@type": "OfferCatalog", name: "Premium Nargile" },
+            ],
+          },
+          areaServed: {
+            "@type": "City",
+            name: "Kırklareli",
+          },
           sameAs: ["https://www.instagram.com/stella_cafe_lounge/"],
+        }),
+      },
+      // WebSite schema — enables sitelinks search box in Google
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: SITE_NAME,
+          url: SITE_URL,
+          potentialAction: {
+            "@type": "SearchAction",
+            target: `${SITE_URL}/menu`,
+            "query-input": "required name=search_term_string",
+          },
         }),
       },
     ],
