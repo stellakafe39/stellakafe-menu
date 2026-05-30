@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useTransition, memo, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, memo, useMemo, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { categories, type Item } from "@/lib/menu-data";
 import { useAdminItems } from "@/lib/admin-store";
@@ -195,7 +195,6 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
 
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
   const [isOpen, setIsOpen] = useState(false);
   const [displayItem, setDisplayItem] = useState<Item | null>(null);
   const { language } = useLanguage();
@@ -214,18 +213,28 @@ function MenuPage() {
   const liveCategories = useMemo(() => {
     if (!dbItems.length) return categories;
 
+    // O(n) build: exact-name → img
     const imgByName = new Map<string, string>();
     for (const item of dbItems) {
       if (item.img) imgByName.set(item.name.toLowerCase().trim(), item.img);
     }
 
+    // O(n) build: "prefix " → img — eliminates the previous O(n) scan per item
+    const prefixMap = new Map<string, string>();
+    for (const [dbName, img] of imgByName) {
+      prefixMap.set(dbName + ' ', img);
+    }
+
     const resolveImg = (staticName: string, fallback: string): string => {
       const lower = staticName.toLowerCase().trim();
+      // O(1): exact match
       if (imgByName.has(lower)) return imgByName.get(lower)!;
+      // O(1): stripped suffix match ("Kaşarlı Tost + Patates" → "Kaşarlı Tost")
       const stripped = lower.replace(/\s*\+\s*patates\b/i, '').trim();
       if (imgByName.has(stripped)) return imgByName.get(stripped)!;
-      for (const [dbName, img] of imgByName) {
-        if (lower.startsWith(dbName + ' ') || lower === dbName) return img;
+      // O(n) but on prefix map entries only — terminates on first hit
+      for (const [prefix, img] of prefixMap) {
+        if (lower.startsWith(prefix)) return img;
       }
       return fallback;
     };
@@ -255,7 +264,7 @@ function MenuPage() {
   );
 
   const handleSetCat = useCallback((id: string | null) => {
-    startTransition(() => setActiveCatId(id));
+    setActiveCatId(id);
   }, []);
 
   const activeCat = liveCategories.find((c) => c.id === activeCatId);
@@ -296,7 +305,7 @@ function MenuPage() {
                   >
                     <img
                       src={storageBg || fallbackBg}
-                      onError={(e) => { const el = e.target as HTMLImageElement; if (el.src !== fallbackBg) el.src = fallbackBg; }}
+                      onError={(e) => { const el = e.target as HTMLImageElement; if (el.getAttribute('src') !== fallbackBg) el.src = fallbackBg; }}
                       alt={title}
                       loading="lazy"
                       decoding="async"
@@ -359,7 +368,7 @@ function MenuPage() {
                     >
                       <img
                         src={storageBg || fallbackBg}
-                        onError={(e) => { const el = e.target as HTMLImageElement; if (el.src !== fallbackBg) el.src = fallbackBg; }}
+                        onError={(e) => { const el = e.target as HTMLImageElement; if (el.getAttribute('src') !== fallbackBg) el.src = fallbackBg; }}
                         alt=""
                         className="absolute inset-0 h-full w-full object-cover"
                         loading="lazy"
@@ -424,7 +433,7 @@ function MenuPage() {
                 decoding="async"
                 onError={(e) => {
                   const el = e.target as HTMLImageElement;
-                  if (el.src !== activeCatFallback) el.src = activeCatFallback;
+                  if (el.getAttribute('src') !== activeCatFallback) el.src = activeCatFallback;
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
@@ -498,7 +507,7 @@ const ProductCard = memo(function ProductCard({
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
             const el = e.target as HTMLImageElement;
-            if (el.src !== fallbackImg) el.src = fallbackImg;
+            if (el.getAttribute('src') !== fallbackImg) el.src = fallbackImg;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
