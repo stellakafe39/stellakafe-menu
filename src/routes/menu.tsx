@@ -120,13 +120,16 @@ function buildEurStr(price: string, rate: number): string {
 function useEurRate(): number {
   const [rate, setRate] = useState(EUR_RATE_FALLBACK);
   useEffect(() => {
+    let active = true;
     fetch('https://api.frankfurter.app/latest?from=EUR&to=TRY')
       .then(r => r.json())
       .then((data: { rates?: { TRY?: number } }) => {
+        if (!active) return;
         const live = data?.rates?.TRY;
         if (live && live > 0) setRate(live);
       })
       .catch(() => {});
+    return () => { active = false; };
   }, []);
   return rate;
 }
@@ -135,6 +138,11 @@ function useEurRate(): number {
 // Replaces vaul Drawer. vaul v1.1.2 + React 19 caused infinite render loops
 // when using a controlled `open` prop derived from non-boolean state.
 // This implementation uses createPortal + CSS transitions + native touch events.
+//
+// `mounted` guard is required: vite.config.ts runs TanStack Start in SSR mode
+// (dev server). createPortal(content, document.body) is evaluated during server
+// render where `document` is undefined → ReferenceError → page crash.
+// The guard defers portal creation until the component has mounted client-side.
 interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
@@ -142,9 +150,13 @@ interface BottomSheetProps {
 }
 
 function BottomSheet({ open, onClose, children }: BottomSheetProps) {
+  const [mounted, setMounted] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
   const dragYRef = useRef<number>(0);
+
+  // Mount guard: defer portal to client-side only (SSR safety)
+  useEffect(() => { setMounted(true); }, []);
 
   // Body scroll lock
   useEffect(() => {
@@ -186,6 +198,8 @@ function BottomSheet({ open, onClose, children }: BottomSheetProps) {
     startYRef.current = null;
     dragYRef.current = 0;
   };
+
+  if (!mounted) return null;
 
   return createPortal(
     <div

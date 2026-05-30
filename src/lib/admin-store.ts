@@ -85,22 +85,26 @@ export function useAdminItems() {
           setLoading(false);
         });
     } else {
-      // localStorage okurken büyük/bozuk JSON donmaya neden olabilir — güvenli parse
-      try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw && raw.length < 5_000_000) {
-          const parsed: AdminItem[] = JSON.parse(raw);
-          const imgMap = new Map(seed.map((s) => [s.id, s.img]));
-          setItems(parsed.map((p) => ({ ...p, img: p.img || imgMap.get(p.id) || "" })));
-        } else {
-          if (raw) localStorage.removeItem(LS_KEY); // bozuk/devasa veriyi temizle
+      // Defer synchronous localStorage work with setTimeout(0) so the first
+      // paint completes before JSON.parse blocks the main thread.
+      const id = setTimeout(() => {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          if (raw && raw.length < 5_000_000) {
+            const parsed: AdminItem[] = JSON.parse(raw);
+            const imgMap = new Map(seed.map((s) => [s.id, s.img]));
+            setItems(parsed.map((p) => ({ ...p, img: p.img || imgMap.get(p.id) || "" })));
+          } else {
+            if (raw) localStorage.removeItem(LS_KEY);
+            setItems(seed);
+          }
+        } catch {
+          localStorage.removeItem(LS_KEY);
           setItems(seed);
         }
-      } catch {
-        localStorage.removeItem(LS_KEY);
-        setItems(seed);
-      }
-      setLoading(false);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(id);
     }
   }, []);
 
