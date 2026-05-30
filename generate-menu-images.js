@@ -1,70 +1,49 @@
 /**
- * ╔═══════════════════════════════════════════════════════════╗
- * ║   Stella Lounge — AI Menu Image Generator                 ║
- * ║   Powered by Google Imagen · Supabase                     ║
- * ╚═══════════════════════════════════════════════════════════╝
+ * ╔═══════════════════════════════════════════════════════════════╗
+ * ║   Stella Lounge — AI Menu Image Generator                     ║
+ * ║   Pollinations AI → Supabase Storage → menu_items.img_url     ║
+ * ╚═══════════════════════════════════════════════════════════════╝
  *
  * Usage:
  *   node --env-file=.env generate-menu-images.js
  *
  * Required .env keys:
- *   GOOGLE_API_KEY              — Google AI Studio API key
  *   VITE_SUPABASE_URL           — Your Supabase project URL
- *   VITE_SUPABASE_SERVICE_KEY   — Supabase service_role key (NOT the anon key)
+ *   VITE_SUPABASE_SERVICE_KEY   — Supabase service_role key (NOT anon key)
  *
- * Install script dependencies (one-time):
- *   npm install @google/genai
- *
- * Generated output:
- *   ./generated-images/categories/<slugified-name>.png
- *   ./generated-images/products/<slugified-name>.png
+ * What it does:
+ *   1. Fetches all menu_items from Supabase
+ *   2. Generates an AI image for each product + each category via Pollinations AI (free)
+ *   3. Uploads images to Supabase Storage bucket "menu-images"
+ *   4. Updates menu_items.img_url with the public Storage URL
+ *   5. Skips items whose local JPG file already exists (safe resume)
  */
 
-import { GoogleGenAI } from '@google/genai';
-import { createClient }  from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import fs   from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// ─── ESM __dirname shim ───────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ─── Runtime config ───────────────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
 const CONFIG = {
-  imageModel:   'imagen-3.0-fast-generate-001', // fast model — available on free tier
-  delayMs:      10_000,                          // 10 s between requests (free-tier rate limit)
-  aspectRatio:  '1:1',
-  outputFormat: 'image/png',
+  delayMs:       10_000,   // 10s — respectful to the free Pollinations server
+  storageBucket: 'menu-images',
+  imgWidth:      1024,
+  imgHeight:     1024,
   outputDirs: {
     categories: path.join(__dirname, 'generated-images', 'categories'),
     products:   path.join(__dirname, 'generated-images', 'products'),
   },
 };
 
-// ─── Category display titles (matches menu-data category IDs) ─────────────────
-const CATEGORY_TITLES = {
-  snacks:          'Atıştırmalıklar',
-  toasts_burgers:  'Tost ve Burger',
-  pasta_pizzas:    'Makarna ve Pizza',
-  main_courses:    'Ana Yemekler',
-  salads:          'Salatalar',
-  breakfast_soups: 'Kahvaltı ve Çorba',
-  desserts:        'Tatlılar',
-  hot_drinks:      'Sıcak İçecekler',
-  turkish_coffee:  'Türk Kahvesi',
-  espresso:        'Espresso',
-  hot_choco:       'Sıcak Çikolata',
-  cold_coffee:     'Soğuk Kahve',
-  frappe:          'Frappe',
-  cold_drinks:     'Soğuk İçecekler',
-  cocktails:       'Kokteyller',
-  shisha:          'Nargile',
-};
-
-// ─── Drink detection ─────────────────────────────────────────────────────────
+// Categories in DB are Turkish display strings — used as-is for prompts.
 const DRINK_CATEGORY_IDS = new Set([
-  'hot_drinks', 'turkish_coffee', 'espresso', 'hot_choco',
-  'cold_coffee', 'frappe', 'cold_drinks', 'cocktails',
+  'Kahveler',
+  'Sıcak Çikolatalar',
+  'Sıcak İçecekler',
+  'Soğuk İçecekler',
 ]);
 
 const DRINK_KEYWORDS = [
@@ -77,7 +56,7 @@ const DRINK_KEYWORDS = [
   'ice tea', 'buzlu', 'içecek', 'drink', 'shot', 'tonic',
 ];
 
-// ─── AI prompts ───────────────────────────────────────────────────────────────
+// ─── Prompts ──────────────────────────────────────────────────────────────────
 function buildPrompt(name, isDrink) {
   if (isDrink) {
     return (
@@ -97,13 +76,7 @@ function buildPrompt(name, isDrink) {
   );
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Turkish-aware slugifier.
- * "Spagetti Napoliten" → "spagetti-napoliten"
- * "ETLER VE IZGARALAR" → "etler-ve-izgaralar"
- */
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function slugify(text) {
   const TR_MAP = {
     ğ:'g', Ğ:'g', ü:'u', Ü:'u', ş:'s', Ş:'s',
@@ -127,48 +100,80 @@ function checkIsDrink(categoryId, name) {
   return DRINK_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function ensureDir(dir) { fs.mkdirSync(dir, { recursive: true }); }
 
-function ensureDir(dir) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-// ─── ANSI terminal colours ────────────────────────────────────────────────────
+// ─── ANSI colours ─────────────────────────────────────────────────────────────
 const C = {
-  reset:  '\x1b[0m',
-  bold:   '\x1b[1m',
-  dim:    '\x1b[2m',
-  green:  '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue:   '\x1b[34m',
-  cyan:   '\x1b[36m',
-  red:    '\x1b[31m',
-  gold:   '\x1b[38;5;220m',
+  reset: '\x1b[0m', bold: '\x1b[1m', dim: '\x1b[2m',
+  green: '\x1b[32m', yellow: '\x1b[33m', blue: '\x1b[34m',
+  cyan: '\x1b[36m', red: '\x1b[31m', gold: '\x1b[38;5;220m',
 };
 
-const box  = str => `${C.bold}${C.gold}${str}${C.reset}`;
-const ok   = msg  => console.log(`  ${C.green}✔${C.reset}  ${msg}`);
-const skip = msg  => console.log(`  ${C.yellow}⊘${C.reset}  ${msg}`);
-const fail = msg  => console.log(`  ${C.red}✖${C.reset}  ${msg}`);
-const info = msg  => console.log(`  ${C.blue}ℹ${C.reset}  ${msg}`);
+const box  = s => `${C.bold}${C.gold}${s}${C.reset}`;
+const ok   = m => console.log(`  ${C.green}✔${C.reset}  ${m}`);
+const skip = m => console.log(`  ${C.yellow}⊘${C.reset}  ${m}`);
+const fail = m => console.log(`  ${C.red}✖${C.reset}  ${m}`);
+const info = m => console.log(`  ${C.blue}ℹ${C.reset}  ${m}`);
+
+// ─── Pollinations AI ──────────────────────────────────────────────────────────
+async function fetchPollinationsImage(prompt) {
+  const url = 'https://image.pollinations.ai/prompt/' +
+    encodeURIComponent(prompt) +
+    `?width=${CONFIG.imgWidth}&height=${CONFIG.imgHeight}&nologo=true`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Pollinations request failed: HTTP ${response.status}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+// ─── Supabase Storage helpers ─────────────────────────────────────────────────
+async function ensureBucket(supabase) {
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const exists = buckets?.some(b => b.name === CONFIG.storageBucket);
+  if (!exists) {
+    const { error } = await supabase.storage.createBucket(CONFIG.storageBucket, {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024,
+    });
+    if (error) throw new Error(`Could not create storage bucket: ${error.message}`);
+    ok(`Created Storage bucket "${CONFIG.storageBucket}"`);
+  } else {
+    ok(`Storage bucket "${CONFIG.storageBucket}" ready`);
+  }
+}
+
+async function uploadToStorage(supabase, storagePath, buffer, contentType = 'image/jpeg') {
+  const { error } = await supabase.storage
+    .from(CONFIG.storageBucket)
+    .upload(storagePath, buffer, { contentType, upsert: true });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+
+  const { data } = supabase.storage
+    .from(CONFIG.storageBucket)
+    .getPublicUrl(storagePath);
+
+  return data.publicUrl;
+}
 
 // ─── Core generator ───────────────────────────────────────────────────────────
-async function generateOne(ai, { name, categoryId, outputDir, index, total }) {
-  const isDrink = checkIsDrink(categoryId, name);
-  const type    = isDrink ? 'Drink' : 'Food ';
-  const slug    = slugify(name);
-  const outFile = path.join(outputDir, `${slug}.png`);
+async function generateOne(supabase, { id, name, categoryId, jobType, outputDir, index, total }) {
+  const isDrink     = checkIsDrink(categoryId, name);
+  const type        = isDrink ? 'Drink' : 'Food ';
+  const slug        = slugify(name);
+  const outFile     = path.join(outputDir, `${slug}.jpg`);
+  const storagePath = `${jobType === 'category' ? 'categories' : 'products'}/${slug}.jpg`;
 
-  // Progress label
   const idx   = String(index).padStart(String(total).length, ' ');
   const label = `${box(`[${idx}/${total}]`)} ${C.cyan}(${type})${C.reset} ${C.bold}${name}${C.reset}`;
   console.log(`\n${label}`);
 
-  // Skip already-generated files (allows safe resume after interruption)
   if (fs.existsSync(outFile)) {
-    skip(`Already exists → ${C.dim}${slug}.png${C.reset}`);
+    skip(`Already exists → ${C.dim}${slug}.jpg${C.reset}`);
     return { name, slug, status: 'skipped' };
   }
 
@@ -176,29 +181,29 @@ async function generateOne(ai, { name, categoryId, outputDir, index, total }) {
   console.log(`  ${C.dim}Prompt: "${prompt.slice(0, 90)}…"${C.reset}`);
 
   try {
-    const response = await ai.models.generateImages({
-      model: CONFIG.imageModel,
-      prompt,
-      config: {
-        numberOfImages: 1,
-        aspectRatio:    CONFIG.aspectRatio,
-        outputMimeType: CONFIG.outputFormat,
-      },
-    });
+    process.stdout.write(`  ${C.dim}Fetching from Pollinations AI…${C.reset}`);
+    const buffer = await fetchPollinationsImage(prompt);
+    process.stdout.write(` ${C.green}done${C.reset}\n`);
 
-    const imageBytes = response?.generatedImages?.[0]?.image?.imageBytes;
+    fs.writeFileSync(outFile, buffer);
+    ok(`Saved → ${C.bold}${slug}.jpg${C.reset} ${C.dim}(${(buffer.length / 1024).toFixed(0)} KB)${C.reset}`);
 
-    if (!imageBytes) {
-      // Safety filter or empty response
-      const reason = response?.generatedImages?.[0]?.raiFilteredReason ?? 'empty response';
-      throw new Error(`No image data returned — reason: ${reason}`);
+    // Upload to Supabase Storage
+    process.stdout.write(`  ${C.dim}Uploading to Storage…${C.reset}`);
+    const publicUrl = await uploadToStorage(supabase, storagePath, buffer, 'image/jpeg');
+    process.stdout.write(` ${C.green}done${C.reset}\n`);
+
+    // Update img_url in menu_items (products only — categories have no DB row)
+    if (jobType === 'product' && id) {
+      const { error: updateErr } = await supabase
+        .from('menu_items')
+        .update({ img_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (updateErr) throw new Error(`DB update failed: ${updateErr.message}`);
+      ok(`img_url updated in DB`);
     }
 
-    const buffer = Buffer.from(imageBytes, 'base64');
-    fs.writeFileSync(outFile, buffer);
-
-    ok(`Saved → ${C.bold}${slug}.png${C.reset} ${C.dim}(${(buffer.length / 1024).toFixed(0)} KB)${C.reset}`);
-    return { name, slug, status: 'ok', file: outFile };
+    return { name, slug, status: 'ok', file: outFile, url: publicUrl };
 
   } catch (e) {
     fail(`${C.red}${e.message}${C.reset}`);
@@ -208,45 +213,39 @@ async function generateOne(ai, { name, categoryId, outputDir, index, total }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  // ── Banner ─────────────────────────────────────────────────────────────────
-  console.log('\n' + box('━'.repeat(54)));
+  console.log('\n' + box('━'.repeat(58)));
   console.log(box('  🍽   Stella Lounge — AI Menu Image Generator'));
-  console.log(box('━'.repeat(54)) + '\n');
+  console.log(box('  🎨   Powered by Pollinations AI (free)'));
+  console.log(box('━'.repeat(58)) + '\n');
 
-  // ── Validate env vars ──────────────────────────────────────────────────────
+  // Validate env
   const REQUIRED_ENV = {
-    GOOGLE_API_KEY:            process.env.GOOGLE_API_KEY,
     VITE_SUPABASE_URL:         process.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY,
   };
 
-  const missing = Object.entries(REQUIRED_ENV)
-    .filter(([, v]) => !v)
-    .map(([k]) => k);
-
+  const missing = Object.entries(REQUIRED_ENV).filter(([, v]) => !v).map(([k]) => k);
   if (missing.length) {
-    console.error(`${C.red}${C.bold}Missing environment variables:${C.reset}`);
+    console.error(`${C.red}${C.bold}Missing env vars:${C.reset}`);
     missing.forEach(k => console.error(`  ${C.red}✖  ${k}${C.reset}`));
-    console.error(`\nCreate a ${C.bold}.env${C.reset} file in the project root and run:`);
-    console.error(`  ${C.cyan}node --env-file=.env generate-menu-images.js${C.reset}\n`);
     process.exit(1);
   }
-
-  // ── Init clients ───────────────────────────────────────────────────────────
-  const ai = new GoogleGenAI({ apiKey: REQUIRED_ENV.GOOGLE_API_KEY });
 
   const supabase = createClient(
     REQUIRED_ENV.VITE_SUPABASE_URL,
     REQUIRED_ENV.VITE_SUPABASE_SERVICE_KEY,
   );
 
-  info(`Model    : ${C.bold}${CONFIG.imageModel}${C.reset}`);
+  info(`Provider : ${C.bold}Pollinations AI${C.reset} (https://pollinations.ai)`);
   info(`Delay    : ${C.bold}${CONFIG.delayMs / 1000}s${C.reset} between requests`);
-  info(`Output   : ${C.bold}${path.join(__dirname, 'generated-images')}${C.reset}\n`);
+  info(`Bucket   : ${C.bold}${CONFIG.storageBucket}${C.reset}\n`);
 
-  // ── Fetch data from Supabase ────────────────────────────────────────────────
-  console.log(`${C.bold}Fetching data from Supabase…${C.reset}`);
+  // Ensure Storage bucket exists
+  console.log(`${C.bold}Checking Supabase Storage…${C.reset}`);
+  await ensureBucket(supabase);
 
+  // Fetch products
+  console.log(`\n${C.bold}Fetching menu_items from Supabase…${C.reset}`);
   const { data: products, error: prodErr } = await supabase
     .from('menu_items')
     .select('id, name_tr, category')
@@ -259,32 +258,26 @@ async function main() {
   }
 
   if (!products || products.length === 0) {
-    console.error(`\n${C.yellow}No products found in Supabase menu_items table.${C.reset}`);
-    console.error('Populate your database via the admin panel first.\n');
+    console.error(`\n${C.yellow}No products in menu_items table.${C.reset}`);
+    console.error('Add items via the admin panel first.\n');
     process.exit(0);
   }
 
   ok(`Fetched ${C.bold}${products.length}${C.reset} products`);
 
-  // Derive unique categories from product data
-  const seenCategories = new Map(); // id → display title
-  for (const item of products) {
-    if (!seenCategories.has(item.category)) {
-      seenCategories.set(
-        item.category,
-        CATEGORY_TITLES[item.category] ?? item.category.replace(/_/g, ' '),
-      );
-    }
-  }
-  const categories = [...seenCategories.entries()].map(([id, title]) => ({ id, title }));
+  // Derive unique categories
+  const seenCategories = new Set();
+  for (const item of products) seenCategories.add(item.category);
+  const categories = [...seenCategories].map(name => ({ id: name, title: name }));
   ok(`Found ${C.bold}${categories.length}${C.reset} unique categories`);
 
-  // ── Prepare output directories ─────────────────────────────────────────────
+  // Prepare directories
   ensureDir(CONFIG.outputDirs.categories);
   ensureDir(CONFIG.outputDirs.products);
 
-  // ── Build work queue: categories first, then products ─────────────────────
-  const catJobs  = categories.map(c => ({
+  // Build job queue
+  const catJobs = categories.map(c => ({
+    id:         null,
     name:       c.title,
     categoryId: c.id,
     outputDir:  CONFIG.outputDirs.categories,
@@ -292,6 +285,7 @@ async function main() {
   }));
 
   const prodJobs = products.map(p => ({
+    id:         p.id,
     name:       p.name_tr,
     categoryId: p.category,
     outputDir:  CONFIG.outputDirs.products,
@@ -300,28 +294,24 @@ async function main() {
 
   const allJobs = [...catJobs, ...prodJobs];
   const total   = allJobs.length;
+  const estMin  = ((total * CONFIG.delayMs) / 60_000).toFixed(0);
 
-  const estimateSec = total * (CONFIG.delayMs / 1000);
-  const estimateMin = (estimateSec / 60).toFixed(0);
-
-  console.log('\n' + box('─'.repeat(54)));
+  console.log('\n' + box('─'.repeat(58)));
   console.log(`  ${C.bold}Work Queue${C.reset}`);
-  console.log(box('─'.repeat(54)));
+  console.log(box('─'.repeat(58)));
   console.log(`  Categories : ${C.cyan}${catJobs.length}${C.reset}`);
   console.log(`  Products   : ${C.cyan}${prodJobs.length}${C.reset}`);
   console.log(`  Total      : ${C.bold}${total}${C.reset}`);
-  console.log(`  Est. time  : ${C.yellow}~${estimateMin} min${C.reset} (worst case, no skips)\n`);
+  console.log(`  Est. time  : ${C.yellow}~${estMin} min${C.reset} (worst case, no skips)\n`);
 
-  // ── Sequential processing ──────────────────────────────────────────────────
+  // Process
   const results = [];
-
   for (let i = 0; i < allJobs.length; i++) {
     const job    = allJobs[i];
-    const result = await generateOne(ai, { ...job, index: i + 1, total });
+    const result = await generateOne(supabase, { ...job, index: i + 1, total });
     results.push(result);
 
-    // Wait between requests — but skip delay after last item or skipped items
-    const isLast    = i === allJobs.length - 1;
+    const isLast     = i === allJobs.length - 1;
     const wasSkipped = result.status === 'skipped';
 
     if (!isLast && !wasSkipped) {
@@ -331,24 +321,25 @@ async function main() {
     }
   }
 
-  // ── Final summary ──────────────────────────────────────────────────────────
+  // Summary
   const nOk      = results.filter(r => r.status === 'ok').length;
   const nSkipped = results.filter(r => r.status === 'skipped').length;
   const nFailed  = results.filter(r => r.status === 'error').length;
   const failed   = results.filter(r => r.status === 'error');
 
-  console.log('\n' + box('━'.repeat(54)));
-  console.log(`${box('  Summary')}`);
-  console.log(box('━'.repeat(54)));
-  console.log(`  ${C.green}✔  Generated : ${nOk}${C.reset}`);
-  console.log(`  ${C.yellow}⊘  Skipped   : ${nSkipped}${C.reset}  ${C.dim}(already existed)${C.reset}`);
-  console.log(`  ${C.red}✖  Failed    : ${nFailed}${C.reset}`);
-  console.log(`\n  📁 Output   : ${C.bold}${path.join(__dirname, 'generated-images')}${C.reset}`);
+  console.log('\n' + box('━'.repeat(58)));
+  console.log(box('  Summary'));
+  console.log(box('━'.repeat(58)));
+  console.log(`  ${C.green}✔  Generated & uploaded : ${nOk}${C.reset}`);
+  console.log(`  ${C.yellow}⊘  Skipped              : ${nSkipped}${C.reset}  ${C.dim}(file existed)${C.reset}`);
+  console.log(`  ${C.red}✖  Failed               : ${nFailed}${C.reset}`);
+  console.log(`\n  📁 Local  : ${C.bold}${path.join(__dirname, 'generated-images')}${C.reset}`);
+  console.log(`  ☁️  Bucket : ${C.bold}${REQUIRED_ENV.VITE_SUPABASE_URL}/storage/v1/object/public/${CONFIG.storageBucket}${C.reset}`);
 
   if (failed.length > 0) {
     console.log(`\n${C.red}${C.bold}Failed items:${C.reset}`);
     failed.forEach(r => console.log(`  ${C.red}•${C.reset} ${r.name}  →  ${C.dim}${r.error}${C.reset}`));
-    console.log(`\n${C.yellow}Tip:${C.reset} Re-run the script — already-generated files are skipped automatically.`);
+    console.log(`\n${C.yellow}Tip:${C.reset} Re-run — existing local files are skipped automatically.`);
   }
 
   console.log(`\n${C.bold}${C.green}Done!${C.reset}\n`);
@@ -356,6 +347,5 @@ async function main() {
 
 main().catch(err => {
   console.error(`\n${C.red}${C.bold}Fatal error:${C.reset} ${err.message}`);
-  console.error(err.stack);
   process.exit(1);
 });

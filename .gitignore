@@ -38,3 +38,5 @@ generated-images/
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
