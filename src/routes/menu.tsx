@@ -340,7 +340,7 @@ function MenuPage() {
 
           {/* Products — key forces remount → animate-cat-in replays */}
           <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-8 animate-cat-in contain-content">
-            <ul className="grid gap-2.5">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {activeCat?.items.map((item, i) => (
                 <ProductCard
                   key={i}
@@ -364,7 +364,7 @@ function MenuPage() {
         <DrawerContent className="bg-card border-border/40 text-foreground outline-none">
           {selectedItem && (
             <div className="mx-auto w-full max-w-md pb-8">
-              <div className="relative w-full overflow-hidden rounded-t-[10px]" style={{ height: "min(42vh,280px)" }}>
+              <div className="relative w-full overflow-hidden rounded-t-[10px]" style={{ height: "min(55vh,340px)" }}>
                 <img
                   src={selectedItem.img}
                   alt={selectedItem.name[language] || selectedItem.name["TR"]}
@@ -442,48 +442,39 @@ const ProductCard = memo(function ProductCard({
   onClick: () => void;
 }) {
   const name = item.name[language] || item.name["TR"];
-  const desc = item.desc[language] || item.desc["TR"];
 
   return (
     <li
-      className="group relative flex gap-3 p-3 rounded-xl bg-card border border-border/40 cursor-pointer hover:border-primary/25 hover:bg-card/80 transition-all duration-300"
+      className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border/40 cursor-pointer hover:border-primary/30 transition-all duration-300"
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
     >
-      {/* Thumbnail */}
-      <div className="relative h-[88px] w-[88px] sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+      {/* Image */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
         <img
           src={item.img}
           alt={name}
           loading="lazy"
           decoding="async"
-          width={96}
-          height={96}
           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
       </div>
 
       {/* Info */}
-      <div className="flex min-w-0 flex-1 flex-col justify-center py-1 pr-1">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-sans text-sm sm:text-[15px] font-semibold text-foreground leading-snug line-clamp-2">
-            {name}
-          </h3>
-          <PriceDisplay
-            price={item.price}
-            language={language}
-            rate={rate}
-            priceClass="font-sans text-sm font-bold text-primary mt-px"
-            eurClass="text-[10px]"
-          />
-        </div>
-        <div className="h-px w-full bg-border/50 mb-2" />
-        <p className="font-sans text-xs text-muted-foreground leading-relaxed line-clamp-2">
-          {desc}
-        </p>
+      <div className="flex flex-col gap-1 px-3 py-2.5">
+        <h3 className="font-sans text-[13px] sm:text-sm font-semibold text-foreground leading-snug line-clamp-2">
+          {name}
+        </h3>
+        <PriceDisplay
+          price={item.price}
+          language={language}
+          rate={rate}
+          priceClass="font-sans text-sm font-bold text-primary"
+          eurClass="text-[10px]"
+        />
       </div>
     </li>
   );
