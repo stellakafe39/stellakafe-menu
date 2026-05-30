@@ -357,9 +357,11 @@ function MenuPage() {
       )}
 
       {/* ── Single shared Drawer — no per-card Drawer mount cost ── */}
+      {/* shouldScaleBackground=false: prevents vaul from scale()-compositing the entire page on open, which caused a hard freeze with many images in the grid */}
       <Drawer
         open={selectedItem !== null}
         onOpenChange={(open) => { if (!open) setSelectedItem(null); }}
+        shouldScaleBackground={false}
       >
         <DrawerContent className="bg-card border-border/40 text-foreground outline-none">
           {selectedItem && (
@@ -458,7 +460,7 @@ const ProductCard = memo(function ProductCard({
           alt={name}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
       </div>
