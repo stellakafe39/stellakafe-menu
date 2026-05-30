@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useTransition, memo, useMemo, useEffect } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState, useTransition, memo, useMemo, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { categories, type Item } from "@/lib/menu-data";
 import { useAdminItems } from "@/lib/admin-store";
 import { useLanguage } from "@/lib/i18n";
@@ -13,7 +14,6 @@ import {
   PlateIcon,
   ShishaIcon,
 } from "@/components/Icons";
-import { Drawer, DrawerContent, DrawerClose } from "@/components/ui/drawer";
 import { Footer } from "@/components/Footer";
 import { X } from "lucide-react";
 
@@ -45,7 +45,6 @@ export const Route = createFileRoute("/menu")({
     ],
   }),
 });
-
 
 const catBg: Record<string, string> = {
   snacks:          r1Img,
@@ -85,9 +84,28 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
   shisha:          ShishaIcon,
 };
 
+// Moved outside component — no recreation on every render
+const CAT_STORAGE_SLUG: Record<string, string> = {
+  snacks:          'atistirmaliklar',
+  toasts_burgers:  'tostlar-ve-burgerler',
+  pasta_pizzas:    'pizzalar',
+  main_courses:    'etler-ve-izgaralar',
+  salads:          'salatalar',
+  breakfast_soups: 'corbalar-kahvalti',
+  desserts:        'tatlilar',
+  hot_drinks:      'sicak-icecekler',
+  turkish_coffee:  'kahveler',
+  espresso:        'kahveler',
+  hot_choco:       'sicak-cikolatalar',
+  cold_coffee:     'soguk-icecekler',
+  frappe:          'soguk-icecekler',
+  cold_drinks:     'soguk-icecekler',
+  cocktails:       'soguk-icecekler',
+  shisha:          '',
+};
+
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
 
-// Fallback rate used until the live fetch resolves (or if it fails)
 const EUR_RATE_FALLBACK = 37;
 
 function buildEurStr(price: string, rate: number): string {
@@ -99,8 +117,6 @@ function buildEurStr(price: string, rate: number): string {
     : `~${eurs[0]}-${eurs[eurs.length - 1]} €`;
 }
 
-// Fetches live EUR/TRY rate from Frankfurter (free, no API key).
-// Returns fallback immediately; updates silently when response arrives.
 function useEurRate(): number {
   const [rate, setRate] = useState(EUR_RATE_FALLBACK);
   useEffect(() => {
@@ -110,24 +126,119 @@ function useEurRate(): number {
         const live = data?.rates?.TRY;
         if (live && live > 0) setRate(live);
       })
-      .catch(() => { /* silent — fallback rate stays */ });
+      .catch(() => {});
   }, []);
   return rate;
+}
+
+// ── Custom BottomSheet ──────────────────────────────────────────────────────
+// Replaces vaul Drawer. vaul v1.1.2 + React 19 caused infinite render loops
+// when using a controlled `open` prop derived from non-boolean state.
+// This implementation uses createPortal + CSS transitions + native touch events.
+interface BottomSheetProps {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+function BottomSheet({ open, onClose, children }: BottomSheetProps) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const startYRef = useRef<number | null>(null);
+  const dragYRef = useRef<number>(0);
+
+  // Body scroll lock
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
+  // Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startYRef.current = e.touches[0].clientY;
+    dragYRef.current = 0;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startYRef.current === null || !sheetRef.current) return;
+    const delta = e.touches[0].clientY - startYRef.current;
+    if (delta <= 0) return;
+    dragYRef.current = delta;
+    sheetRef.current.style.transition = 'none';
+    sheetRef.current.style.transform = `translateY(${delta}px)`;
+  };
+
+  const handleTouchEnd = () => {
+    if (!sheetRef.current) return;
+    sheetRef.current.style.transition = '';
+    sheetRef.current.style.transform = '';
+    if (dragYRef.current > 100) {
+      onClose();
+    }
+    startYRef.current = null;
+    dragYRef.current = 0;
+  };
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      className={`fixed inset-0 z-[200] ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}
+    >
+      {/* Backdrop */}
+      <div
+        className={`absolute inset-0 bg-black/80 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div
+        ref={sheetRef}
+        className={`absolute inset-x-0 bottom-0 bg-card border-t border-border/40 rounded-t-[10px] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Drag handle */}
+        <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  // isOpen drives the BottomSheet animation; displayItem holds content during close animation
+  const [isOpen, setIsOpen] = useState(false);
+  const [displayItem, setDisplayItem] = useState<Item | null>(null);
   const { language } = useLanguage();
   const { items: dbItems } = useAdminItems();
   const eurRate = useEurRate();
 
-  // name-based img lookup: works regardless of how DB organises categories
+  const openItem = useCallback((item: Item) => {
+    setDisplayItem(item);
+    setIsOpen(true);
+  }, []);
+
+  const closeItem = useCallback(() => {
+    setIsOpen(false);
+    // Keep displayItem populated until close animation finishes (300ms) to prevent flash
+    setTimeout(() => setDisplayItem(null), 350);
+  }, []);
+
   const liveCategories = useMemo(() => {
     if (!dbItems.length) return categories;
 
-    // Build lowercase name → img_url map from all DB items
     const imgByName = new Map<string, string>();
     for (const item of dbItems) {
       if (item.img) imgByName.set(item.name.toLowerCase().trim(), item.img);
@@ -135,12 +246,9 @@ function MenuPage() {
 
     const resolveImg = (staticName: string, fallback: string): string => {
       const lower = staticName.toLowerCase().trim();
-      // 1. Exact match
       if (imgByName.has(lower)) return imgByName.get(lower)!;
-      // 2. Strip "+ Patates" suffix (e.g. "Kaşarlı Tost + Patates" → "Kaşarlı Tost")
       const stripped = lower.replace(/\s*\+\s*patates\b/i, '').trim();
       if (imgByName.has(stripped)) return imgByName.get(stripped)!;
-      // 3. DB name is a prefix of the static name
       for (const [dbName, img] of imgByName) {
         if (lower.startsWith(dbName + ' ') || lower === dbName) return img;
       }
@@ -155,26 +263,6 @@ function MenuPage() {
       })),
     }));
   }, [dbItems]);
-
-  // Hardcoded map from static category ID → actual Storage slug (derived from DB category names)
-  const CAT_STORAGE_SLUG: Record<string, string> = {
-    snacks:          'atistirmaliklar',
-    toasts_burgers:  'tostlar-ve-burgerler',
-    pasta_pizzas:    'pizzalar',
-    main_courses:    'etler-ve-izgaralar',
-    salads:          'salatalar',
-    breakfast_soups: 'corbalar-kahvalti',
-    desserts:        'tatlilar',
-    hot_drinks:      'sicak-icecekler',
-    turkish_coffee:  'kahveler',
-    espresso:        'kahveler',
-    hot_choco:       'sicak-cikolatalar',
-    cold_coffee:     'soguk-icecekler',
-    frappe:          'soguk-icecekler',
-    cold_drinks:     'soguk-icecekler',
-    cocktails:       'soguk-icecekler',
-    shisha:          '',
-  };
 
   const catStorageUrls = useMemo(() =>
     SUPABASE_URL
@@ -191,9 +279,9 @@ function MenuPage() {
     [],
   );
 
-  const handleSetCat = (id: string | null) => {
+  const handleSetCat = useCallback((id: string | null) => {
     startTransition(() => setActiveCatId(id));
-  };
+  }, []);
 
   const activeCat = liveCategories.find((c) => c.id === activeCatId);
 
@@ -265,7 +353,6 @@ function MenuPage() {
           {/* Sticky category strip */}
           <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-border/30">
             <div className="relative flex items-center gap-2.5 max-w-2xl mx-auto px-4 py-2.5">
-              {/* Back button */}
               <button
                 onClick={() => handleSetCat(null)}
                 className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-card border border-border hover:border-primary/40 text-muted-foreground hover:text-primary transition-all duration-300"
@@ -274,7 +361,6 @@ function MenuPage() {
                 <ArrowLeftIcon className="h-4 w-4" />
               </button>
 
-              {/* Mini image cards */}
               <div className="flex gap-2 overflow-x-auto no-scrollbar">
                 {liveCategories.map((cat) => {
                   const active = activeCatId === cat.id;
@@ -304,14 +390,8 @@ function MenuPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
                       <div className="absolute inset-0 flex flex-col items-center justify-end pb-1.5 px-0.5 gap-0.5">
-                        <Icon
-                          className={`h-3 w-3 shrink-0 ${active ? "text-primary" : "text-white/80"}`}
-                        />
-                        <span
-                          className={`text-[7px] font-semibold leading-tight text-center line-clamp-2 ${
-                            active ? "text-primary" : "text-white/80"
-                          }`}
-                        >
+                        <Icon className={`h-3 w-3 shrink-0 ${active ? "text-primary" : "text-white/80"}`} />
+                        <span className={`text-[7px] font-semibold leading-tight text-center line-clamp-2 ${active ? "text-primary" : "text-white/80"}`}>
                           {title}
                         </span>
                       </div>
@@ -320,7 +400,6 @@ function MenuPage() {
                 })}
               </div>
 
-              {/* Right fade mask */}
               <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-background to-transparent" />
             </div>
           </div>
@@ -338,7 +417,7 @@ function MenuPage() {
             <div className="h-px w-8 bg-primary/35 mx-auto mt-4" />
           </div>
 
-          {/* Products — key forces remount → animate-cat-in replays */}
+          {/* Products */}
           <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-8 animate-cat-in contain-content">
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {activeCat?.items.map((item, i) => (
@@ -347,7 +426,7 @@ function MenuPage() {
                   item={item}
                   language={language}
                   rate={eurRate}
-                  onClick={() => setSelectedItem(item)}
+                  onSelect={openItem}
                 />
               ))}
             </ul>
@@ -356,55 +435,55 @@ function MenuPage() {
         </div>
       )}
 
-      {/* ── Single shared Drawer — no per-card Drawer mount cost ── */}
-      {/* shouldScaleBackground=false: prevents vaul from scale()-compositing the entire page on open, which caused a hard freeze with many images in the grid */}
-      <Drawer
-        open={selectedItem !== null}
-        onOpenChange={(open) => { if (!open) setSelectedItem(null); }}
-        shouldScaleBackground={false}
-      >
-        <DrawerContent className="bg-card border-border/40 text-foreground outline-none">
-          {selectedItem && (
-            <div className="mx-auto w-full max-w-md pb-8">
-              <div className="relative w-full overflow-hidden rounded-t-[10px]" style={{ height: "min(55vh,340px)" }}>
-                <img
-                  src={selectedItem.img}
-                  alt={selectedItem.name[language] || selectedItem.name["TR"]}
-                  className="w-full h-full object-cover"
-                  decoding="async"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
-                <DrawerClose className="absolute top-3.5 right-3.5 h-8 w-8 flex items-center justify-center rounded-full bg-black/55 backdrop-blur text-white hover:bg-black/80 transition-colors">
-                  <X className="h-4 w-4" />
-                </DrawerClose>
-              </div>
-              <div className="px-6 pt-5">
-                <div className="h-px w-8 bg-primary/60 mb-4" />
-                <div className="flex justify-between items-start gap-4 mb-3">
-                  <h2 className="font-display text-2xl sm:text-3xl font-light text-foreground leading-tight">
-                    {selectedItem.name[language] || selectedItem.name["TR"]}
-                  </h2>
-                  <PriceDisplay
-                    price={selectedItem.price}
-                    language={language}
-                    rate={eurRate}
-                    priceClass="font-sans text-xl font-bold text-primary mt-1"
-                    eurClass="text-sm"
-                  />
-                </div>
-                <p className="font-sans text-sm text-muted-foreground leading-relaxed">
-                  {selectedItem.desc[language] || selectedItem.desc["TR"]}
-                </p>
-              </div>
-              <div className="px-6 mt-7">
-                <DrawerClose className="w-full py-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary font-sans font-bold uppercase tracking-[0.25em] text-[11px] hover:bg-primary hover:text-black transition-all duration-300">
-                  Kapat
-                </DrawerClose>
-              </div>
+      {/* ── Custom BottomSheet — vaul replaced due to React 19 render-loop bug ── */}
+      <BottomSheet open={isOpen} onClose={closeItem}>
+        {displayItem && (
+          <div className="mx-auto w-full max-w-md pb-8">
+            <div className="relative w-full overflow-hidden rounded-t-[10px]" style={{ height: "min(55vh,340px)" }}>
+              <img
+                src={displayItem.img}
+                alt={displayItem.name[language] || displayItem.name["TR"]}
+                className="w-full h-full object-cover"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+              <button
+                onClick={closeItem}
+                className="absolute top-3.5 right-3.5 h-8 w-8 flex items-center justify-center rounded-full bg-black/55 backdrop-blur text-white hover:bg-black/80 transition-colors"
+                aria-label="Kapat"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-          )}
-        </DrawerContent>
-      </Drawer>
+            <div className="px-6 pt-5">
+              <div className="h-px w-8 bg-primary/60 mb-4" />
+              <div className="flex justify-between items-start gap-4 mb-3">
+                <h2 className="font-display text-2xl sm:text-3xl font-light text-foreground leading-tight">
+                  {displayItem.name[language] || displayItem.name["TR"]}
+                </h2>
+                <PriceDisplay
+                  price={displayItem.price}
+                  language={language}
+                  rate={eurRate}
+                  priceClass="font-sans text-xl font-bold text-primary mt-1"
+                  eurClass="text-sm"
+                />
+              </div>
+              <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+                {displayItem.desc[language] || displayItem.desc["TR"]}
+              </p>
+            </div>
+            <div className="px-6 mt-7">
+              <button
+                onClick={closeItem}
+                className="w-full py-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary font-sans font-bold uppercase tracking-[0.25em] text-[11px] hover:bg-primary hover:text-black transition-all duration-300"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
     </main>
   );
 }
@@ -431,27 +510,28 @@ function PriceDisplay({
   );
 }
 
-// memo → skip re-render when other state (selectedItem, activeCatId) changes
+// Accepts stable `onSelect` setter — memo now correctly skips re-renders
+// when only unrelated state (isOpen, etc.) changes in the parent
 const ProductCard = memo(function ProductCard({
   item,
   language,
   rate,
-  onClick,
+  onSelect,
 }: {
   item: Item;
   language: string;
   rate: number;
-  onClick: () => void;
+  onSelect: (item: Item) => void;
 }) {
   const name = item.name[language] || item.name["TR"];
 
   return (
     <li
-      className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border/40 cursor-pointer hover:border-primary/30 transition-all duration-300"
+      className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border/40 cursor-pointer hover:border-primary/30 transition-colors duration-300"
       role="button"
       tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => e.key === "Enter" && onClick()}
+      onClick={() => onSelect(item)}
+      onKeyDown={(e) => e.key === "Enter" && onSelect(item)}
     >
       {/* Image */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
