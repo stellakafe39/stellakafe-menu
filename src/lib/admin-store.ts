@@ -168,28 +168,47 @@ export function useAdminItems() {
         return {};
       }
 
-      // ── INSERT ────────────────────────────────────────────────────────────
+      // ── INSERT ───────────────────────────────────────────────────────────
+      // isNew=true: the form has NO database UUID yet. isValidDbId is NOT
+      // called here — that gate is strictly for UPDATE / DELETE / TOGGLE.
+      // We chain .select().single() so Supabase returns the created row
+      // (including the DB-generated UUID) in one round-trip, removing the
+      // need for a separate fetchFromDB() call that could wipe local state.
       if (isNew) {
-        const { error } = await supabase.from("menu_items").insert({
-          name_tr:      item.name,
-          name_bg:      item.name_bg  || item.name,
-          name_gr:      item.name_gr  || item.name,
-          desc_tr:      item.desc,
-          desc_bg:      item.desc_bg  || item.desc,
-          desc_gr:      item.desc_gr  || item.desc,
-          category:     item.category,
-          price:        item.price,
-          img_url:      item.img,
-          available:    true,
-          is_available: true,
-        });
+        const { data: created, error } = await (supabase
+          .from("menu_items")
+          .insert({
+            name_tr:      item.name,
+            name_bg:      item.name_bg  || item.name,
+            name_gr:      item.name_gr  || item.name,
+            desc_tr:      item.desc,
+            desc_bg:      item.desc_bg  || item.desc,
+            desc_gr:      item.desc_gr  || item.desc,
+            category:     item.category,
+            price:        item.price,
+            img_url:      item.img,
+            available:    true,
+            is_available: true,
+          })
+          .select()
+          .single() as Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>);
+
         if (error) return { error: error.message };
-        // Re-fetch after insert so local state has the real DB-assigned UUID
-        await fetchFromDB();
+
+        // Prepend the newly created row (with its real UUID) to local state.
+        // Fall back to a full re-fetch only if Supabase didn't return the row.
+        const newItem = created ? mapRow(created) : null;
+        if (newItem) {
+          setItems((prev) => [newItem, ...prev]);
+        } else {
+          await fetchFromDB();
+        }
         return {};
       }
 
-      // ── UPDATE ────────────────────────────────────────────────────────────
+      // ── UPDATE ───────────────────────────────────────────────────────────
+      // isNew=false: the form MUST hold a real DB UUID. Block anything that
+      // isn't a valid identifier so we never fire id=eq.null requests.
       if (!isValidDbId(item.id)) {
         console.error("saveItem UPDATE blocked: invalid id", item.id);
         return { error: "Geçersiz ürün ID'si — güncellenemez." };
