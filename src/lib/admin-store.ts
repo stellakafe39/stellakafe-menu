@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { categories } from "./menu-data";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
@@ -36,42 +36,71 @@ const seed: AdminItem[] = categories.flatMap((c) =>
 
 const LS_KEY = "stella-admin-v2";
 
-function mapRow(r: Record<string, unknown>): AdminItem {
+// ── ID validation ─────────────────────────────────────────────────────────────
+// Returns true if the ID is safe to use in a Supabase .eq("id", ...) call.
+// Blocks empty string, the literal string "null"/"undefined", and local-only IDs.
+function isValidDbId(id: unknown): id is string {
+  if (!id || typeof id !== "string") return false;
+  if (id === "null" || id === "undefined" || id === "") return false;
+  if (id.startsWith("local-") || id.startsWith("new-")) return false;
+  return true;
+}
+
+// ── Row mapping ───────────────────────────────────────────────────────────────
+// Returns null for rows with missing/null IDs so they are filtered before
+// entering state — prevents "null" strings from ever reaching mutation guards.
+function mapRow(r: Record<string, unknown>): AdminItem | null {
+  const rawId = r.id;
+  if (!isValidDbId(rawId)) return null;
   return {
-    id: String(r.id),
-    name: String(r.name_tr ?? ""),
-    name_bg: String(r.name_bg ?? ""),
-    name_gr: String(r.name_gr ?? ""),
-    desc: String(r.desc_tr ?? ""),
-    desc_bg: String(r.desc_bg ?? ""),
-    desc_gr: String(r.desc_gr ?? ""),
-    price: String(r.price ?? ""),
+    id: String(rawId),
+    name:    String(r.name_tr  ?? ""),
+    name_bg: String(r.name_bg  ?? ""),
+    name_gr: String(r.name_gr  ?? ""),
+    desc:    String(r.desc_tr  ?? ""),
+    desc_bg: String(r.desc_bg  ?? ""),
+    desc_gr: String(r.desc_gr  ?? ""),
+    price:    String(r.price   ?? ""),
     category: String(r.category ?? ""),
-    img: String(r.img_url ?? ""),
+    img:      String(r.img_url ?? ""),
     available: Boolean(r.available ?? true),
   };
+}
+
+function applyRows(data: Array<Record<string, unknown>>): AdminItem[] {
+  return data.map(mapRow).filter((i): i is AdminItem => i !== null);
 }
 
 export function useAdminItems() {
   const [items, setItems] = useState<AdminItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Guard against concurrent fetchFromDB calls
+  const fetchingRef = useRef(false);
 
   // ── Fresh fetch from Supabase ─────────────────────────────────────────────
+  // Safe to call after a successful mutation. Will no-op if a fetch is already
+  // in flight to prevent cascading re-fetches.
   const fetchFromDB = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
-    const { data, error } = await supabase
-      .from("menu_items")
-      .select("*")
-      .order("created_at", { ascending: false }) as { data: Array<Record<string, unknown>> | null; error: { message: string } | null };
-    if (!error && data && data.length > 0) {
-      setItems(data.map(mapRow));
-    } else if (!error) {
-      // table is empty — show nothing (no seeds in DB mode)
-      setItems([]);
+    if (!isSupabaseConfigured || fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const { data, error } = await supabase
+        .from("menu_items")
+        .select("*")
+        .order("created_at", { ascending: false }) as {
+          data: Array<Record<string, unknown>> | null;
+          error: { message: string } | null;
+        };
+      if (!error && data) {
+        const valid = applyRows(data);
+        setItems(valid.length > 0 ? valid : []);
+      }
+    } finally {
+      fetchingRef.current = false;
     }
   }, []);
 
-  // ── Initial load ──────────────────────────────────────────────────────────
+  // ── Initial load — fires ONCE on mount ────────────────────────────────────
   useEffect(() => {
     if (isSupabaseConfigured) {
       const abortTimer = setTimeout(() => {
@@ -86,7 +115,7 @@ export function useAdminItems() {
         .then(({ data, error }: { data: null | Array<Record<string, unknown>>; error: null | { message: string } }) => {
           clearTimeout(abortTimer);
           if (!error && data && data.length > 0) {
-            setItems(data.map(mapRow));
+            setItems(applyRows(data));
           } else {
             setItems(seed);
           }
@@ -115,9 +144,9 @@ export function useAdminItems() {
       }, 0);
       return () => clearTimeout(tid);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── localStorage sync (offline mode) ─────────────────────────────────────
+  // ── localStorage sync (offline mode only) ─────────────────────────────────
   useEffect(() => {
     if (!isSupabaseConfigured && !loading) {
       try { localStorage.setItem(LS_KEY, JSON.stringify(items)); } catch { /* ignore */ }
@@ -125,11 +154,12 @@ export function useAdminItems() {
   }, [items, loading]);
 
   // ── saveItem ──────────────────────────────────────────────────────────────
-  // isNew = true  → always INSERT a new row
-  // isNew = false → always UPDATE the existing row identified by item.id
+  // isNew = true  → INSERT a new row, then re-fetch to sync IDs
+  // isNew = false → UPDATE the existing row; optimistic local update only
   const saveItem = useCallback(
     async (item: AdminItem, isNew: boolean): Promise<{ error?: string }> => {
-      // ── Offline (no Supabase) ────────────────────────────────────────────
+
+      // ── Offline (no Supabase) ──────────────────────────────────────────────
       if (!isSupabaseConfigured) {
         setItems((prev) => {
           if (isNew) return [{ ...item, id: `local-${Date.now()}` }, ...prev];
@@ -154,13 +184,13 @@ export function useAdminItems() {
           is_available: true,
         });
         if (error) return { error: error.message };
-        // Re-fetch so state = exact DB state (no stale seeds)
+        // Re-fetch after insert so local state has the real DB-assigned UUID
         await fetchFromDB();
         return {};
       }
 
       // ── UPDATE ────────────────────────────────────────────────────────────
-      if (!item.id || item.id === "null" || item.id === "") {
+      if (!isValidDbId(item.id)) {
         console.error("saveItem UPDATE blocked: invalid id", item.id);
         return { error: "Geçersiz ürün ID'si — güncellenemez." };
       }
@@ -182,9 +212,8 @@ export function useAdminItems() {
         })
         .eq("id", item.id);
       if (error) return { error: error.message };
-      // Optimistic local update then sync with DB for accuracy
+      // Optimistic local update — no re-fetch to avoid cascading requests
       setItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-      await fetchFromDB();
       return {};
     },
     [fetchFromDB],
@@ -192,7 +221,7 @@ export function useAdminItems() {
 
   // ── deleteItem ────────────────────────────────────────────────────────────
   const deleteItem = useCallback(async (id: string): Promise<{ error?: string }> => {
-    if (!id || id === "null" || id === "") {
+    if (!isValidDbId(id)) {
       console.error("deleteItem blocked: invalid id", id);
       return { error: "Geçersiz ürün ID'si — silinemez." };
     }
@@ -209,15 +238,15 @@ export function useAdminItems() {
   }, []);
 
   // ── toggleAvail ───────────────────────────────────────────────────────────
+  // The Supabase call is OUTSIDE the setItems updater on purpose.
+  // React StrictMode invokes state updaters twice, which would fire duplicate
+  // network requests if the call were inside the updater function.
   const toggleAvail = useCallback(async (id: string): Promise<void> => {
-    if (!id || id === "null" || id === "") {
+    if (!isValidDbId(id)) {
       console.error("toggleAvail blocked: invalid id", id);
       return;
     }
 
-    // Determine next value and update local state. The Supabase call is kept
-    // OUTSIDE the state updater — React StrictMode calls updaters twice which
-    // would fire duplicate network requests if the call were inside.
     let nextAvail: boolean | undefined;
     setItems((prev) => {
       const item = prev.find((i) => i.id === id);
