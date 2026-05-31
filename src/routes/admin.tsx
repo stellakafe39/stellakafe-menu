@@ -251,6 +251,7 @@ type FormState = {
   available: boolean;
 };
 const emptyForm = (cat = ""): FormState => ({
+  id: undefined,
   name: "", name_bg: "", name_gr: "", desc: "", desc_bg: "", desc_gr: "",
   category: cat, price: "", img: "", available: true,
 });
@@ -303,9 +304,9 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
     if (!form.name.trim() || !form.price.trim()) return;
     setSaving(true); setSaveError("");
 
-    // form.id is ONLY set by openEdit — it is always a real Supabase UUID.
-    // If form.id is undefined we are creating a brand-new item.
-    const isNew = !form.id;
+    // isNew: true when form.id is absent OR is not a real DB UUID.
+    // This means any ghost/empty/seed ID is safely routed to INSERT.
+    const isNew = !form.id || !isValidDbId(form.id);
 
     const item: AdminItem = {
       id: form.id ?? "",      // empty string for new items; saveItem(isNew=true) ignores this

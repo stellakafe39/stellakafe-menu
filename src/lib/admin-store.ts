@@ -196,8 +196,8 @@ export function useAdminItems() {
       // isNew=false: the form MUST hold a real DB UUID. Block anything that
       // isn't a valid identifier so we never fire id=eq.null requests.
       if (!isValidDbId(item.id)) {
-        console.error("saveItem UPDATE blocked: invalid id", item.id);
-        return { error: "Geçersiz ürün ID'si — güncellenemez." };
+        // Ghost/empty ID reached the UPDATE path — promote to INSERT
+        return saveItem(item, true);
       }
       const { error } = await supabase
         .from("menu_items")
