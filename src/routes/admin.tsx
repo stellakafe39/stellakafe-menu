@@ -7,7 +7,7 @@ import {
   Package, AlertCircle, TrendingUp, ArrowRight, Database,
 } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { useAdminItems, categoryTitle, type AdminItem } from "@/lib/admin-store";
+import { useAdminItems, categoryTitle, isValidDbId, type AdminItem } from "@/lib/admin-store";
 import { useLiveCategories, type AdminCategory } from "@/lib/categories-store";
 import { Toggle } from "@/components/admin/Toggle";
 import { ThemeProvider, useTheme } from "@/lib/theme";
@@ -376,30 +376,42 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
               </tr>
             </thead>
             <tbody>
-              {filtered.map(i => (
-                <tr key={i.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+              {filtered.map(i => {
+                const canMutate = isValidDbId(i.id);
+                return (
+                <tr key={i.id || i.name} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3">
                     {i.img
                       ? <img src={i.img} alt={i.name} loading="lazy" className="h-12 w-12 rounded-lg object-cover border border-border" />
                       : <div className="h-12 w-12 rounded-lg bg-muted/30 flex items-center justify-center border border-border"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>}
                   </td>
-                  <td className="px-5 py-3 font-medium text-foreground">{i.name}</td>
+                  <td className="px-5 py-3 font-medium text-foreground">
+                    {i.name}
+                    {!canMutate && <span className="ml-2 text-[9px] uppercase tracking-widest text-muted-foreground/40">statik</span>}
+                  </td>
                   <td className="px-5 py-3 hidden md:table-cell text-muted-foreground text-xs">{categoryTitle(i.category, categoryOptions)}</td>
                   <td className="px-5 py-3 text-primary font-medium whitespace-nowrap">{i.price}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <Toggle checked={i.available} onChange={() => toggleAvail(i.id)} size="sm" />
+                      <Toggle checked={i.available} onChange={() => canMutate && toggleAvail(i.id)} size="sm" />
                       <span className={`text-xs ${i.available ? "text-emerald-500" : "text-red-400"}`}>{i.available ? "Mevcut" : "Tükendi"}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(i)} className="p-2 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => setConfirmDelete(i)} className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-400 text-muted-foreground transition-colors"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => canMutate && openEdit(i)} disabled={!canMutate}
+                        className={`p-2 rounded-lg transition-colors ${canMutate ? "hover:bg-primary/10 hover:text-primary text-muted-foreground" : "opacity-25 cursor-not-allowed text-muted-foreground"}`}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => canMutate && setConfirmDelete(i)} disabled={!canMutate}
+                        className={`p-2 rounded-lg transition-colors ${canMutate ? "hover:bg-red-500/10 hover:text-red-400 text-muted-foreground" : "opacity-25 cursor-not-allowed text-muted-foreground"}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {filtered.length === 0 && (
                 <tr><td colSpan={6} className="px-5 py-16 text-center text-sm text-muted-foreground">Ürün bulunamadı.</td></tr>
               )}

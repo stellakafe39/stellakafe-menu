@@ -39,7 +39,7 @@ const LS_KEY = "stella-admin-v2";
 // ── ID validation ─────────────────────────────────────────────────────────────
 // Returns true if the ID is safe to use in a Supabase .eq("id", ...) call.
 // Blocks empty string, the literal string "null"/"undefined", and local-only IDs.
-function isValidDbId(id: unknown): id is string {
+export function isValidDbId(id: unknown): id is string {
   if (!id || typeof id !== "string") return false;
   if (id === "null" || id === "undefined" || id === "") return false;
   if (id.startsWith("local-") || id.startsWith("new-")) return false;
@@ -93,7 +93,9 @@ export function useAdminItems() {
         };
       if (!error && data) {
         const valid = applyRows(data);
-        setItems(valid.length > 0 ? valid : []);
+        if (valid.length > 0) setItems(valid);
+        // Do NOT wipe to [] on empty — RLS may restrict SELECT after a write.
+        // deleteItem removes items via direct prev.filter, not via fetchFromDB.
       }
     } finally {
       fetchingRef.current = false;
@@ -184,7 +186,6 @@ export function useAdminItems() {
             price:        item.price,
             img_url:      item.img,
             available:    true,
-            is_available: true,
           }]);
         if (error) return { error: error.message };
         await fetchFromDB();
@@ -211,7 +212,6 @@ export function useAdminItems() {
           price:        item.price,
           img_url:      item.img,
           available:    item.available,
-          is_available: item.available,
           updated_at:   new Date().toISOString(),
         })
         .eq("id", item.id);
@@ -262,7 +262,7 @@ export function useAdminItems() {
     if (isSupabaseConfigured && nextAvail !== undefined) {
       supabase
         .from("menu_items")
-        .update({ available: nextAvail, is_available: nextAvail, updated_at: new Date().toISOString() })
+        .update({ available: nextAvail, updated_at: new Date().toISOString() })
         .eq("id", id)
         .then(() => {})
         .catch(() => {});
