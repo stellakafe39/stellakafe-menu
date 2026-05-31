@@ -1,7 +1,13 @@
 -- ─────────────────────────────────────────────────────────────────────────
--- Migration: fix menu_items.category — Turkish display names → slug IDs
--- Run this once in Supabase → SQL Editor → Run
+-- Migration: fix menu_items — run this in Supabase → SQL Editor → Run
+-- Step 1: remove phantom rows with null IDs (inserted before client-side
+--         UUID fix; they are invisible in the app but waste space)
+-- Step 2: map Turkish display-name categories → correct slug IDs
 -- ─────────────────────────────────────────────────────────────────────────
+
+-- 0. Remove phantom rows with null ID
+DELETE FROM menu_items WHERE id IS NULL;
+
 
 UPDATE menu_items SET category = 'snacks'          WHERE category = 'Atıştırmalıklar';
 UPDATE menu_items SET category = 'toasts_burgers'  WHERE category = 'Tostlar ve Burgerler';

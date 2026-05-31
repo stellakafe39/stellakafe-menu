@@ -171,11 +171,16 @@ export function useAdminItems() {
       }
 
       // ── INSERT ───────────────────────────────────────────────────────────
-      // isNew=true: no database UUID yet — isValidDbId is NOT applied here.
+      // isNew=true: generate UUID client-side because the menu_items table
+      // has no gen_random_uuid() default on the id column — without this,
+      // Supabase stores id=null and the row is invisible to applyRows.
       if (isNew) {
+        const newId = crypto.randomUUID();
+        const now   = new Date().toISOString();
         const { error } = await supabase
           .from("menu_items")
           .insert([{
+            id:           newId,
             name_tr:      item.name,
             name_bg:      item.name_bg  || item.name,
             name_gr:      item.name_gr  || item.name,
@@ -186,6 +191,9 @@ export function useAdminItems() {
             price:        item.price,
             img_url:      item.img,
             available:    true,
+            is_available: true,
+            created_at:   now,
+            updated_at:   now,
           }]);
         if (error) return { error: error.message };
         await fetchFromDB();
@@ -212,6 +220,7 @@ export function useAdminItems() {
           price:        item.price,
           img_url:      item.img,
           available:    item.available,
+          is_available: item.available,
           updated_at:   new Date().toISOString(),
         })
         .eq("id", item.id);
