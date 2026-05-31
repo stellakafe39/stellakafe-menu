@@ -273,9 +273,18 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
       i.name.toLowerCase().includes(query.toLowerCase())
     ), [items, query, filterCat]);
 
-  const openNew = () => { setForm(emptyForm(categoryOptions[0]?.id ?? "")); setDrawerOpen(true); };
+  const openNew = () => {
+    setForm(emptyForm(categoryOptions[0]?.id ?? ""));
+    setDrawerOpen(true);
+  };
   const openEdit = (it: AdminItem) => {
-    setForm({ id: it.id, name: it.name, name_bg: it.name_bg, name_gr: it.name_gr, desc: it.desc, desc_bg: it.desc_bg, desc_gr: it.desc_gr, category: it.category, price: it.price, img: it.img, available: it.available });
+    // id is required for update — it must be a real Supabase UUID
+    setForm({
+      id: it.id,
+      name: it.name, name_bg: it.name_bg, name_gr: it.name_gr,
+      desc: it.desc, desc_bg: it.desc_bg, desc_gr: it.desc_gr,
+      category: it.category, price: it.price, img: it.img, available: it.available,
+    });
     setDrawerOpen(true);
   };
   const closeDrawer = () => { setDrawerOpen(false); setSaveError(""); };
@@ -293,13 +302,26 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
   const submit = async () => {
     if (!form.name.trim() || !form.price.trim()) return;
     setSaving(true); setSaveError("");
+
+    // form.id is ONLY set by openEdit — it is always a real Supabase UUID.
+    // If form.id is undefined we are creating a brand-new item.
+    const isNew = !form.id;
+
     const item: AdminItem = {
-      id: form.id ?? `new-${Date.now()}`,
-      name: form.name, name_bg: form.name_bg || form.name, name_gr: form.name_gr || form.name,
-      desc: form.desc, desc_bg: form.desc_bg || form.desc, desc_gr: form.desc_gr || form.desc,
-      category: form.category, price: form.price, img: form.img, available: form.available,
+      id: form.id ?? "",      // empty string for new items; saveItem(isNew=true) ignores this
+      name:    form.name,
+      name_bg: form.name_bg || form.name,
+      name_gr: form.name_gr || form.name,
+      desc:    form.desc,
+      desc_bg: form.desc_bg || form.desc,
+      desc_gr: form.desc_gr || form.desc,
+      category: form.category,
+      price:    form.price,
+      img:      form.img,
+      available: form.available,
     };
-    const res = await saveItem(item);
+
+    const res = await saveItem(item, isNew);
     if (res.error) setSaveError(res.error); else closeDrawer();
     setSaving(false);
   };
