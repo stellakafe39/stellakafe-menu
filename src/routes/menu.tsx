@@ -14,7 +14,7 @@ import {
   PlateIcon,
 } from "@/components/Icons";
 import { Footer } from "@/components/Footer";
-import { X, Search } from "lucide-react";
+import { X } from "lucide-react";
 
 import heroImg from "@/assets/hero.jpg";
 
@@ -67,7 +67,6 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
 function MenuPage() {
   // ── State ─────────────────────────────────────────────────────────────────
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen]           = useState(false);
   const [displayItem, setDisplayItem] = useState<Item | null>(null);
 
@@ -171,34 +170,15 @@ function MenuPage() {
     }));
   }, [dbItems, baseCategories]);
 
-  // ── RENDER-PHASE derivations (NO hooks, NO state mutations) ───────────────
-  // These are plain const computations. They run during render but never
-  // call setState, so they CANNOT cause re-render loops by definition.
-
-  const q          = searchQuery.trim().toLowerCase();
-  const isSearching = q.length > 0;
-
-  // Global search: scan every category's items
-  const searchResults: Item[] = isSearching
-    ? liveCategories.flatMap(cat =>
-        cat.items.filter(item =>
-          (item.name["TR"] ?? "").toLowerCase().includes(q) ||
-          (item.name[language] ?? "").toLowerCase().includes(q),
-        )
-      )
-    : [];
-
-  // Active category (only relevant when not searching)
-  const activeCat = !isSearching && activeCatId
+  // ── Render-time derivations ───────────────────────────────────────────────
+  const activeCat = activeCatId
     ? liveCategories.find(c => c.id === activeCatId) ?? null
     : null;
 
   const activeCatFallback = (activeCatId ? catBg[activeCatId] : null) ?? heroImg;
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   const selectCat = useCallback((id: string | null) => {
     setActiveCatId(id);
-    setSearchQuery(""); // clear search when navigating categories
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -206,66 +186,10 @@ function MenuPage() {
     <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
       <Navbar />
 
-      {/* ── GLOBAL SEARCH BAR — always visible above category/product views ── */}
-      <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-border/20">
-        <div className="mx-auto max-w-2xl px-4 py-2.5">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Ürün ara…"
-              className="w-full bg-card/80 border border-border/50 rounded-full pl-10 pr-10 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60 transition-colors placeholder:text-muted-foreground/40"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-colors"
-                aria-label="Aramayı temizle"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* SEARCH RESULTS VIEW                                               */}
+      {/* CATEGORIES GRID VIEW                                               */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {isSearching ? (
-        <div className="flex-1 flex flex-col">
-          <div className="text-center pt-8 pb-4 px-4">
-            <p className="font-sans text-xs text-muted-foreground/60 tracking-wider">
-              {searchResults.length > 0
-                ? `${searchResults.length} sonuç bulundu`
-                : `"${searchQuery}" için sonuç bulunamadı`}
-            </p>
-          </div>
-          {searchResults.length > 0 && (
-            <section className="mx-auto w-full max-w-2xl px-4 pb-10">
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {searchResults.map((item, i) => (
-                  <ProductCard
-                    key={i}
-                    item={item}
-                    language={language}
-                    onSelect={openItem}
-                    fallbackImg={heroImg}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
-          <Footer />
-        </div>
-
-      /* ═══════════════════════════════════════════════════════════════════ */
-      /* CATEGORIES GRID VIEW                                               */
-      /* ═══════════════════════════════════════════════════════════════════ */
-      ) : !activeCatId ? (
+      {!activeCatId ? (
         <div className="flex-1 flex flex-col">
           <header className="px-5 sm:px-8 pt-8 pb-7 text-center animate-fade-up">
             <span className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/65">Stella</span>
