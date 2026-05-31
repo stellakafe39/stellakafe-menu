@@ -64,22 +64,23 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
   cocktails:       CocktailIcon,
 };
 
-
 function MenuPage() {
+  // ── State ─────────────────────────────────────────────────────────────────
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
-  const [menuSearch, setMenuSearch]   = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen]           = useState(false);
   const [displayItem, setDisplayItem] = useState<Item | null>(null);
+
   const { language } = useLanguage();
   const { items: dbItems } = useAdminItems();
   const { liveCategories: baseCategories } = useLiveCategories();
 
-  // Refs for the sheet panel (swipe-to-close)
-  const sheetRef   = useRef<HTMLDivElement>(null);
+  // Refs for the swipe-to-close sheet
+  const sheetRef    = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
   const touchDragY  = useRef<number>(0);
 
-  // ── Open / close ───────────────────────────────────────────────────────────
+  // ── Item detail sheet ──────────────────────────────────────────────────────
   const openItem = useCallback((item: Item) => {
     setDisplayItem(item);
     setIsOpen(true);
@@ -87,50 +88,50 @@ function MenuPage() {
 
   const closeItem = useCallback(() => {
     setIsOpen(false);
-    // Clear content after the slide-down animation finishes (300 ms)
     setTimeout(() => setDisplayItem(null), 350);
   }, []);
 
-  // ── Side effects (scroll lock + Escape key) ────────────────────────────────
+  // Scroll-lock + Escape key — only active while sheet is open
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeItem(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeItem(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, closeItem]);
 
-  // ── Touch handlers (swipe-down-to-close) ──────────────────────────────────
+  // Touch handlers (swipe-down-to-close sheet)
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchDragY.current  = 0;
   };
-
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current === null || !sheetRef.current) return;
     const delta = e.touches[0].clientY - touchStartY.current;
     if (delta <= 0) return;
     touchDragY.current = delta;
-    sheetRef.current.style.transition = 'none';
+    sheetRef.current.style.transition = "none";
     sheetRef.current.style.transform  = `translateY(${delta}px)`;
   };
-
   const handleTouchEnd = () => {
     if (!sheetRef.current) return;
-    sheetRef.current.style.transition = '';
-    sheetRef.current.style.transform  = '';
+    sheetRef.current.style.transition = "";
+    sheetRef.current.style.transform  = "";
     if (touchDragY.current > 100) closeItem();
     touchStartY.current = null;
     touchDragY.current  = 0;
   };
 
-  // ── Data: merge category list with live item images from Supabase ──────────
+  // ── Data: merge DB item images into static category tree ──────────────────
+  // useMemo here is correct — this is an EXPENSIVE computation (O(n×m) map
+  // builds) that must NOT run on every keystroke. It only re-runs when the
+  // underlying data sources change (after initial Supabase load).
   const liveCategories = useMemo(() => {
     if (!dbItems.length) return baseCategories;
 
@@ -141,13 +142,13 @@ function MenuPage() {
 
     const prefixMap = new Map<string, string>();
     for (const [dbName, img] of imgByName) {
-      prefixMap.set(dbName + ' ', img);
+      prefixMap.set(dbName + " ", img);
     }
 
     const resolveImg = (staticName: string, fallback: string): string => {
       const lower = staticName.toLowerCase().trim();
       if (imgByName.has(lower)) return imgByName.get(lower)!;
-      const stripped = lower.replace(/\s*\+\s*patates\b/i, '').trim();
+      const stripped = lower.replace(/\s*\+\s*patates\b/i, "").trim();
       if (imgByName.has(stripped)) return imgByName.get(stripped)!;
       for (const [prefix, img] of prefixMap) {
         if (lower.startsWith(prefix)) return img;
@@ -159,7 +160,6 @@ function MenuPage() {
       ...cat,
       items: cat.items.length
         ? cat.items.map(item => ({ ...item, img: resolveImg(item.name.TR, item.img) }))
-        // DB-only categories: populate items from menu_items table
         : dbItems
             .filter(i => i.category === cat.id && i.available)
             .map(i => ({
@@ -171,37 +171,103 @@ function MenuPage() {
     }));
   }, [dbItems, baseCategories]);
 
-  const handleSetCat = useCallback((id: string | null) => {
-    setActiveCatId(id);
-    setMenuSearch("");
-  }, []);
+  // ── RENDER-PHASE derivations (NO hooks, NO state mutations) ───────────────
+  // These are plain const computations. They run during render but never
+  // call setState, so they CANNOT cause re-render loops by definition.
 
-  const activeCat = useMemo(
-    () => liveCategories.find((c) => c.id === activeCatId) ?? null,
-    [liveCategories, activeCatId],
-  );
+  const q          = searchQuery.trim().toLowerCase();
+  const isSearching = q.length > 0;
 
-  const displayItems = useMemo(() => {
-    const q = menuSearch.trim().toLowerCase();
-    const all = activeCat?.items ?? [];
-    if (!q) return all;
-    return all.filter(item =>
-      (item.name[language] ?? item.name["TR"] ?? "").toLowerCase().includes(q) ||
-      (item.name["TR"] ?? "").toLowerCase().includes(q),
-    );
-  }, [activeCat, menuSearch, language]);
+  // Global search: scan every category's items
+  const searchResults: Item[] = isSearching
+    ? liveCategories.flatMap(cat =>
+        cat.items.filter(item =>
+          (item.name["TR"] ?? "").toLowerCase().includes(q) ||
+          (item.name[language] ?? "").toLowerCase().includes(q),
+        )
+      )
+    : [];
+
+  // Active category (only relevant when not searching)
+  const activeCat = !isSearching && activeCatId
+    ? liveCategories.find(c => c.id === activeCatId) ?? null
+    : null;
 
   const activeCatFallback = (activeCatId ? catBg[activeCatId] : null) ?? heroImg;
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const selectCat = useCallback((id: string | null) => {
+    setActiveCatId(id);
+    setSearchQuery(""); // clear search when navigating categories
+  }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
       <Navbar />
 
-      {!activeCatId ? (
-        /* ═══════════════ CATEGORIES GRID ═══════════════ */
-        <div className="flex-1 flex flex-col pt-20">
-          <header className="px-5 sm:px-8 pt-10 pb-8 text-center animate-fade-up">
+      {/* ── GLOBAL SEARCH BAR — always visible above category/product views ── */}
+      <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-border/20">
+        <div className="mx-auto max-w-2xl px-4 py-2.5">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Ürün ara…"
+              className="w-full bg-card/80 border border-border/50 rounded-full pl-10 pr-10 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60 transition-colors placeholder:text-muted-foreground/40"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-colors"
+                aria-label="Aramayı temizle"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SEARCH RESULTS VIEW                                               */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {isSearching ? (
+        <div className="flex-1 flex flex-col">
+          <div className="text-center pt-8 pb-4 px-4">
+            <p className="font-sans text-xs text-muted-foreground/60 tracking-wider">
+              {searchResults.length > 0
+                ? `${searchResults.length} sonuç bulundu`
+                : `"${searchQuery}" için sonuç bulunamadı`}
+            </p>
+          </div>
+          {searchResults.length > 0 && (
+            <section className="mx-auto w-full max-w-2xl px-4 pb-10">
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {searchResults.map((item, i) => (
+                  <ProductCard
+                    key={i}
+                    item={item}
+                    language={language}
+                    onSelect={openItem}
+                    fallbackImg={heroImg}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+          <Footer />
+        </div>
+
+      /* ═══════════════════════════════════════════════════════════════════ */
+      /* CATEGORIES GRID VIEW                                               */
+      /* ═══════════════════════════════════════════════════════════════════ */
+      ) : !activeCatId ? (
+        <div className="flex-1 flex flex-col">
+          <header className="px-5 sm:px-8 pt-8 pb-7 text-center animate-fade-up">
             <span className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/65">Stella</span>
             <h1 className="font-display text-5xl sm:text-6xl font-light text-foreground mt-1">Menü</h1>
             <div className="h-px w-10 bg-primary/40 mx-auto mt-4" />
@@ -213,11 +279,11 @@ function MenuPage() {
                 const Icon   = iconFor[cat.id] ?? PlateIcon;
                 const imgSrc = cat.cover_img || catBg[cat.id] || heroImg;
                 const title  = cat.title?.[language] || cat.title?.["TR"];
-
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => handleSetCat(cat.id)}
+                    type="button"
+                    onClick={() => selectCat(cat.id)}
                     className="group relative aspect-[3/4] overflow-hidden rounded-xl focus:outline-none"
                     style={{ animationDelay: `${i * 0.03}s` }}
                     aria-label={title}
@@ -250,15 +316,18 @@ function MenuPage() {
           <Footer />
         </div>
 
+      /* ═══════════════════════════════════════════════════════════════════ */
+      /* PRODUCTS LIST VIEW                                                 */
+      /* ═══════════════════════════════════════════════════════════════════ */
       ) : (
-        /* ═══════════════ PRODUCTS LIST ═══════════════ */
-        <div className="flex-1 flex flex-col pt-16">
+        <div className="flex-1 flex flex-col">
 
-          {/* Sticky category strip */}
-          <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-2xl border-b border-border/30">
-            <div className="relative flex items-center gap-2.5 max-w-2xl mx-auto px-4 py-2.5">
+          {/* Category thumbnail strip */}
+          <div className="bg-background/90 backdrop-blur-xl border-b border-border/20">
+            <div className="relative flex items-center gap-2.5 max-w-2xl mx-auto px-4 py-2">
               <button
-                onClick={() => handleSetCat(null)}
+                type="button"
+                onClick={() => selectCat(null)}
                 className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-card border border-border hover:border-primary/40 text-muted-foreground hover:text-primary transition-all duration-300"
                 aria-label="Geri"
               >
@@ -266,26 +335,21 @@ function MenuPage() {
               </button>
 
               <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                {liveCategories.map((cat) => {
-                  const active   = activeCatId === cat.id;
-                  const imgSrc   = cat.cover_img || catBg[cat.id] || heroImg;
-                  const Icon     = iconFor[cat.id] ?? PlateIcon;
-                  const title    = cat.title?.[language] || cat.title?.["TR"];
+                {liveCategories.map(cat => {
+                  const active = activeCatId === cat.id;
+                  const imgSrc = cat.cover_img || catBg[cat.id] || heroImg;
+                  const Icon   = iconFor[cat.id] ?? PlateIcon;
+                  const title  = cat.title?.[language] || cat.title?.["TR"];
                   return (
                     <button
                       key={cat.id}
-                      onClick={() => handleSetCat(cat.id)}
+                      type="button"
+                      onClick={() => selectCat(cat.id)}
                       aria-label={title}
                       className={`relative flex-shrink-0 overflow-hidden rounded-lg focus:outline-none transition-all duration-300 ${active ? "ring-1 ring-primary animate-cat-glow opacity-100 scale-105" : "opacity-40 hover:opacity-70 hover:scale-[1.04]"}`}
                       style={{ width: 54, height: 70 }}
                     >
-                      <img
-                        src={imgSrc}
-                        alt=""
-                        className="absolute inset-0 h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <img src={imgSrc} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
                       <div className="absolute inset-0 flex flex-col items-center justify-end pb-1.5 px-0.5 gap-0.5">
                         <Icon className={`h-3 w-3 shrink-0 ${active ? "text-primary" : "text-white/80"}`} />
@@ -315,91 +379,42 @@ function MenuPage() {
             <div className="h-px w-8 bg-primary/35 mx-auto mt-4" />
           </div>
 
-          {/* Menu search bar */}
-          <div className="mx-auto w-full max-w-2xl px-4 mb-4">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
-              <input
-                type="text"
-                value={menuSearch}
-                onChange={e => setMenuSearch(e.target.value)}
-                placeholder="Ürün ara…"
-                className="w-full bg-card border border-border/50 rounded-full pl-10 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/60 transition-colors placeholder:text-muted-foreground/40"
-              />
-              {menuSearch && (
-                <button
-                  type="button"
-                  onClick={() => setMenuSearch("")}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-colors"
-                  aria-label="Aramayı temizle"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* Product grid */}
           <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-8 animate-cat-in contain-content">
-            {displayItems.length > 0 ? (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {displayItems.map((item, i) => (
-                  <ProductCard
-                    key={i}
-                    item={item}
-                    language={language}
-                    onSelect={openItem}
-                    fallbackImg={activeCatFallback}
-                  />
-                ))}
-              </ul>
-            ) : menuSearch ? (
-              <div className="py-16 text-center">
-                <p className="text-sm text-muted-foreground/60">
-                  &ldquo;{menuSearch}&rdquo; ile eşleşen ürün bulunamadı.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setMenuSearch("")}
-                  className="mt-3 text-xs text-primary hover:underline"
-                >
-                  Aramayı temizle
-                </button>
-              </div>
-            ) : null}
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {(activeCat?.items ?? []).map((item, i) => (
+                <ProductCard
+                  key={i}
+                  item={item}
+                  language={language}
+                  onSelect={openItem}
+                  fallbackImg={activeCatFallback}
+                />
+              ))}
+            </ul>
           </section>
           <Footer />
         </div>
       )}
 
-      {/*
-       * ── Item detail panel ──────────────────────────────────────────────────
-       * Rendered as a plain fixed div — NO createPortal, NO separate component,
-       * NO mounted/unmounted state that can trigger cross-component render loops.
-       * Visibility is CSS-only (translate-y / opacity / pointer-events).
-       */}
+      {/* ── Item detail sheet ──────────────────────────────────────────────── */}
       <div
         role="dialog"
         aria-modal={isOpen}
-        className={`fixed inset-0 z-[200] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+        className={`fixed inset-0 z-[200] ${isOpen ? "pointer-events-auto" : "pointer-events-none"}`}
       >
-        {/* Backdrop */}
         <div
-          className={`absolute inset-0 bg-black/80 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 bg-black/80 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0"}`}
           onClick={closeItem}
         />
-
-        {/* Sheet */}
         <div
           ref={sheetRef}
-          className={`absolute inset-x-0 bottom-0 bg-card border-t border-border/40 rounded-t-[10px] transition-transform duration-300 ${isOpen ? 'translate-y-0' : 'translate-y-full'}`}
+          className={`absolute inset-x-0 bottom-0 bg-card border-t border-border/40 rounded-t-[10px] transition-transform duration-300 ${isOpen ? "translate-y-0" : "translate-y-full"}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Drag handle */}
           <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
-
           {displayItem && (
             <div className="mx-auto w-full max-w-md pb-8">
               <div className="relative w-full overflow-hidden rounded-t-[10px]" style={{ height: "min(55vh,340px)" }}>
@@ -410,11 +425,12 @@ function MenuPage() {
                   decoding="async"
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
-                    if (el.getAttribute('src') !== activeCatFallback) el.src = activeCatFallback;
+                    if (el.getAttribute("src") !== activeCatFallback) el.src = activeCatFallback;
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
                 <button
+                  type="button"
                   onClick={closeItem}
                   className="absolute top-3.5 right-3.5 h-8 w-8 flex items-center justify-center rounded-full bg-black/55 backdrop-blur text-white hover:bg-black/80 transition-colors"
                   aria-label="Kapat"
@@ -438,6 +454,7 @@ function MenuPage() {
               </div>
               <div className="px-6 mt-7">
                 <button
+                  type="button"
                   onClick={closeItem}
                   className="w-full py-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary font-sans font-bold uppercase tracking-[0.25em] text-[11px] hover:bg-primary hover:text-black transition-all duration-300"
                 >
@@ -464,14 +481,13 @@ const ProductCard = memo(function ProductCard({
   fallbackImg: string;
 }) {
   const name = item.name[language] || item.name["TR"];
-
   return (
     <li
       className="group relative flex flex-col overflow-hidden rounded-xl bg-card border border-border/40 cursor-pointer hover:border-primary/30 transition-colors duration-300"
       role="button"
       tabIndex={0}
       onClick={() => onSelect(item)}
-      onKeyDown={(e) => e.key === "Enter" && onSelect(item)}
+      onKeyDown={e => e.key === "Enter" && onSelect(item)}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
         <img
@@ -480,9 +496,9 @@ const ProductCard = memo(function ProductCard({
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          onError={(e) => {
+          onError={e => {
             const el = e.target as HTMLImageElement;
-            if (el.getAttribute('src') !== fallbackImg) el.src = fallbackImg;
+            if (el.getAttribute("src") !== fallbackImg) el.src = fallbackImg;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
