@@ -141,16 +141,17 @@ export function useAdminItems() {
       // ── INSERT ────────────────────────────────────────────────────────────
       if (isNew) {
         const { error } = await supabase.from("menu_items").insert({
-          name_tr:  item.name,
-          name_bg:  item.name_bg  || item.name,
-          name_gr:  item.name_gr  || item.name,
-          desc_tr:  item.desc,
-          desc_bg:  item.desc_bg  || item.desc,
-          desc_gr:  item.desc_gr  || item.desc,
-          category: item.category,
-          price:    item.price,
-          img_url:  item.img,
-          available: true,
+          name_tr:      item.name,
+          name_bg:      item.name_bg  || item.name,
+          name_gr:      item.name_gr  || item.name,
+          desc_tr:      item.desc,
+          desc_bg:      item.desc_bg  || item.desc,
+          desc_gr:      item.desc_gr  || item.desc,
+          category:     item.category,
+          price:        item.price,
+          img_url:      item.img,
+          available:    true,
+          is_available: true,
         });
         if (error) return { error: error.message };
         // Re-fetch so state = exact DB state (no stale seeds)
@@ -162,22 +163,24 @@ export function useAdminItems() {
       const { error } = await supabase
         .from("menu_items")
         .update({
-          name_tr:    item.name,
-          name_bg:    item.name_bg  || item.name,
-          name_gr:    item.name_gr  || item.name,
-          desc_tr:    item.desc,
-          desc_bg:    item.desc_bg  || item.desc,
-          desc_gr:    item.desc_gr  || item.desc,
-          category:   item.category,
-          price:      item.price,
-          img_url:    item.img,
-          available:  item.available,
-          updated_at: new Date().toISOString(),
+          name_tr:      item.name,
+          name_bg:      item.name_bg  || item.name,
+          name_gr:      item.name_gr  || item.name,
+          desc_tr:      item.desc,
+          desc_bg:      item.desc_bg  || item.desc,
+          desc_gr:      item.desc_gr  || item.desc,
+          category:     item.category,
+          price:        item.price,
+          img_url:      item.img,
+          available:    item.available,
+          is_available: item.available,
+          updated_at:   new Date().toISOString(),
         })
         .eq("id", item.id);
       if (error) return { error: error.message };
-      // Update local state immediately for snappy UI, then confirm from DB
+      // Optimistic local update then sync with DB for accuracy
       setItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+      await fetchFromDB();
       return {};
     },
     [fetchFromDB],

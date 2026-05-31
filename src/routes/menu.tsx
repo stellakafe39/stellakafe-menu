@@ -155,19 +155,26 @@ function MenuPage() {
       return fallback;
     };
 
-    return baseCategories.map(cat => ({
-      ...cat,
-      items: cat.items.length
-        ? cat.items.map(item => ({ ...item, img: resolveImg(item.name.TR, item.img) }))
-        : dbItems
-            .filter(i => i.category === cat.id && i.available)
-            .map(i => ({
-              name: { TR: i.name, BG: i.name_bg || i.name, GR: i.name_gr || i.name },
-              desc: { TR: i.desc, BG: i.desc_bg || i.desc, GR: i.desc_gr || i.desc },
-              price: i.price,
-              img: i.img,
-            })),
-    }));
+    return baseCategories.map(cat => {
+      // DB items for this category take priority over static mock data
+      const catDbItems = dbItems.filter(i => i.category === cat.id && i.available);
+      if (catDbItems.length > 0) {
+        return {
+          ...cat,
+          items: catDbItems.map(i => ({
+            name: { TR: i.name, BG: i.name_bg || i.name, GR: i.name_gr || i.name },
+            desc: { TR: i.desc, BG: i.desc_bg || i.desc, GR: i.desc_gr || i.desc },
+            price: i.price,
+            img: i.img,
+          })),
+        };
+      }
+      // No DB items for this category — fall back to static with updated images
+      return {
+        ...cat,
+        items: cat.items.map(item => ({ ...item, img: resolveImg(item.name.TR, item.img) })),
+      };
+    });
   }, [dbItems, baseCategories]);
 
   // ── Render-time derivations ───────────────────────────────────────────────
@@ -183,7 +190,7 @@ function MenuPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-[100svh] bg-background text-foreground flex flex-col">
+    <main className="min-h-[100svh] bg-background text-foreground flex flex-col pt-16">
       <Navbar />
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
