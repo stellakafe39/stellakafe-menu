@@ -1,18 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import heroImg from "@/assets/hero.jpg";
+const HERO_POSTER = "/hero-poster.webp";
 import c1Img from "@/assets/c1.jpg";
 import d1Img from "@/assets/d1.jpg";
 import g1Img from "@/assets/g1.jpg";
 import h1Img from "@/assets/h1.jpg";
 import r1Img from "@/assets/r1.jpg";
-import s1Img from "@/assets/s1.jpg";
 import { ArrowRightIcon, StarIcon } from "@/components/Icons";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useLanguage } from "@/lib/i18n";
 import { MapPin, Clock, Coffee, Wine, ChefHat, Instagram } from "lucide-react";
 
-const MAPS_URL = "https://www.google.com/maps/place/Stella+Cafe+%26+Lounge/@41.7351,27.2201,17z";
+const MAPS_URL = "https://www.google.com/maps/place/STELLA+CAFE+LOUNGE/@41.7345705,27.2216154,17z/data=!3m1!4b1!4m16!1m9!4m8!1m0!1m6!1m2!1s0x40a753fa146db7eb:0x3e8fcec4cb9a60a5!2sSTELLA+CAFE+LOUNGE,+Karacaibrahim,+Dere+%C3%9Cst%C3%BC+Sk.+No:8,+39000+K%C4%B1rklareli+Merkez%2FK%C4%B1rklareli!2m2!1d27.2241893!2d41.734568!3m5!1s0x40a753fa146db7eb:0x3e8fcec4cb9a60a5!8m2!3d41.7345665!4d27.2241903!16s%2Fg%2F11z1x8wt4z";
 const INSTAGRAM_URL = "https://www.instagram.com/stella_cafe_lounge/";
 
 export const Route = createFileRoute("/")({
@@ -30,8 +30,7 @@ export const Route = createFileRoute("/")({
       { property: "og:url", content: "https://stellalounge39.vercel.app/" },
     ],
     links: [
-      { rel: "preload", as: "image", href: heroImg },
-      { rel: "preload", as: "video", href: "/hero-video.mp4", type: "video/mp4" },
+      { rel: "preload", as: "image", href: "/hero-poster.webp" },
     ],
   }),
 });
@@ -53,13 +52,13 @@ function Landing() {
             loop
             muted
             playsInline
-            poster={heroImg}
+            preload="none"
+            poster={HERO_POSTER}
             className="h-full w-full object-cover"
             aria-hidden="true"
           >
             <source src="/hero-video.mp4" type="video/mp4" />
-            {/* Fallback for browsers that don't support video */}
-            <img src={heroImg} alt="Stella Cafe & Lounge iç mekan" className="h-full w-full object-cover" />
+            <img src={heroImg} alt="Stella Cafe & Lounge iç mekan" className="h-full w-full object-cover" fetchPriority="high" />
           </video>
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-background" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/20 via-transparent to-background/20" />
@@ -157,7 +156,7 @@ function Landing() {
         <div className="animate-marquee flex items-center gap-0 whitespace-nowrap" style={{ width: "max-content" }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <span key={i} className="font-sans text-[9px] tracking-[0.4em] uppercase text-primary/50 pr-14">
-              Premium Kahve · İmza İçecekler · Gurme Lezzetler · Lüks Atmosfer · Nargile
+              Premium Kahve · İmza İçecekler · Gurme Lezzetler · Lüks Atmosfer · Kırklareli
             </span>
           ))}
         </div>
@@ -283,7 +282,7 @@ function Landing() {
               <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
             </div>
             <div className="absolute -bottom-5 -right-3 sm:-right-7 w-36 h-36 sm:w-48 sm:h-48 rounded-xl overflow-hidden border-2 border-card shadow-[0_12px_48px_rgba(0,0,0,0.6)] animate-float">
-              <img src={s1Img} alt="Stella nargile" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+              <img src={d1Img} alt="Stella tatlı" loading="lazy" decoding="async" className="h-full w-full object-cover" />
             </div>
             <div className="absolute top-8 -left-3 w-0.5 h-16 bg-gradient-to-b from-primary to-transparent rounded-full" />
           </div>
@@ -313,9 +312,9 @@ function Landing() {
                   <span className="font-sans text-[10px] font-semibold tracking-[0.32em] uppercase">Adres</span>
                 </div>
                 <address className="text-foreground/75 leading-relaxed text-sm not-italic">
-                  Kırklareli Merkez,<br />
-                  Cumhuriyet Meydanı, No: 1<br />
-                  Kırklareli / Türkiye
+                  Karacaibrahim Mah.,<br />
+                  Dere Üstü Sk. No: 8<br />
+                  Kırklareli Merkez / Türkiye
                 </address>
                 <a
                   href={MAPS_URL}
@@ -368,7 +367,7 @@ function Landing() {
           >
             <iframe
               title="Stella Cafe & Lounge — Konum"
-              src="https://www.google.com/maps/embed?pb=!4m5!3m4!1s0x40a753fa146db7eb:0x3e8fcec4cb9a60a5!8m2!3d41.7351!4d27.2201"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3018.254!2d27.2219853!3d41.7345665!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x40a753fa146db7eb%3A0x3e8fcec4cb9a60a5!2sSTELLA%20CAFE%20LOUNGE!5e0!3m2!1str!2str!4v1748649600000!5m2!1str!2str"
               width="100%"
               height="100%"
               style={{

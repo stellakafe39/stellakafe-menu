@@ -12,7 +12,6 @@ import {
   DessertIcon,
   GlassIcon,
   PlateIcon,
-  ShishaIcon,
 } from "@/components/Icons";
 import { Footer } from "@/components/Footer";
 import { X } from "lucide-react";
@@ -24,28 +23,27 @@ export const Route = createFileRoute("/menu")({
   head: () => ({
     meta: [
       { title: "Stella Lounge — Menü" },
-      { name: "description", content: "Stella Cafe & Lounge'un tüm menüsü. Atıştırmalıklar, pizzalar, burgerler, kokteyller, kahveler ve nargile." },
+      { name: "description", content: "Stella Cafe & Lounge'un tüm menüsü. Atıştırmalıklar, pizzalar, burgerler, kokteyller, kahveler ve tatlılar." },
     ],
   }),
 });
 
 const catBg: Record<string, string> = {
-  snacks:          '/categories/atistirmaliklar.png',
-  toasts_burgers:  '/categories/tostlar-burgerler.png',
-  pasta_pizzas:    '/categories/makarnalar-pizzalar.png',
-  main_courses:    '/categories/ana-yemekler-izgaralar.png',
-  salads:          '/categories/salatalar.png',
-  breakfast_soups: '/categories/corbalar-kahvalti.png',
-  desserts:        '/categories/tatlilar.png',
-  hot_drinks:      '/categories/sicak-icecekler.png',
-  turkish_coffee:  '/categories/kumda-turk-kahveleri.png',
-  espresso:        '/categories/espresso-bazli-kahveler.png',
-  hot_choco:       '/categories/sicak-cikolatalar.png',
-  cold_coffee:     '/categories/soguk-kahveler.png',
-  frappe:          '/categories/frappeler.png',
-  cold_drinks:     '/categories/soguk-icecekler-frozen.png',
+  snacks:          '/categories/atistirmaliklar.webp',
+  toasts_burgers:  '/categories/tostlar-burgerler.webp',
+  pasta_pizzas:    '/categories/makarnalar-pizzalar.webp',
+  main_courses:    '/categories/ana-yemekler-izgaralar.webp',
+  salads:          '/categories/salatalar.webp',
+  breakfast_soups: '/categories/corbalar-kahvalti.webp',
+  desserts:        '/categories/tatlilar.webp',
+  hot_drinks:      '/categories/sicak-icecekler.webp',
+  turkish_coffee:  '/categories/kumda-turk-kahveleri.webp',
+  espresso:        '/categories/espresso-bazli-kahveler.webp',
+  hot_choco:       '/categories/sicak-cikolatalar.webp',
+  cold_coffee:     '/categories/soguk-kahveler.webp',
+  frappe:          '/categories/frappeler.webp',
+  cold_drinks:     '/categories/soguk-icecekler-frozen.webp',
   cocktails:       '/categories/cocktails.jpg',
-  shisha:          '/categories/shisha.jpg',
 };
 
 const iconFor: Record<string, React.FC<{ className?: string }>> = {
@@ -64,7 +62,6 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
   frappe:          GlassIcon,
   cold_drinks:     GlassIcon,
   cocktails:       CocktailIcon,
-  shisha:          ShishaIcon,
 };
 
 

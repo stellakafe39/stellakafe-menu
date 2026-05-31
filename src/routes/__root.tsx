@@ -100,8 +100,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // Geo
       { name: "geo.region", content: "TR-39" },
       { name: "geo.placename", content: "Kırklareli" },
-      { name: "geo.position", content: "41.7351;27.2201" },
-      { name: "ICBM", content: "41.7351, 27.2201" },
+      { name: "geo.position", content: "41.7345665;27.2241903" },
+      { name: "ICBM", content: "41.7345665, 27.2241903" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -127,7 +127,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           telephone: "+90 555 000 0000",
           address: {
             "@type": "PostalAddress",
-            streetAddress: "Cumhuriyet Meydanı, No: 1",
+            streetAddress: "Karacaibrahim Mah., Dere Üstü Sk. No: 8",
             addressLocality: "Kırklareli Merkez",
             addressRegion: "Kırklareli",
             postalCode: "39000",
@@ -135,8 +135,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           },
           geo: {
             "@type": "GeoCoordinates",
-            latitude: "41.7351",
-            longitude: "27.2201",
+            latitude: "41.7345665",
+            longitude: "27.2241903",
           },
           openingHoursSpecification: [
             {
@@ -152,13 +152,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
               closes: "02:00",
             },
           ],
-          servesCuisine: ["Turkish Cuisine", "Italian", "International", "Coffee", "Cocktails"],
+          servesCuisine: ["Turkish Cuisine", "Italian", "International", "Coffee", "Desserts"],
           priceRange: "₺₺",
           hasMenu: `${SITE_URL}/menu`,
           currenciesAccepted: "TRY",
           paymentAccepted: "Cash, Credit Card",
           amenityFeature: [
-            { "@type": "LocationFeatureSpecification", name: "Nargile / Hookah", value: true },
             { "@type": "LocationFeatureSpecification", name: "Outdoor Seating", value: true },
             { "@type": "LocationFeatureSpecification", name: "WiFi", value: true },
             { "@type": "LocationFeatureSpecification", name: "Reservations", value: true },
@@ -172,7 +171,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
               { "@type": "OfferCatalog", name: "Soğuk İçecekler & Kokteyller" },
               { "@type": "OfferCatalog", name: "Yiyecekler & Atıştırmalıklar" },
               { "@type": "OfferCatalog", name: "Tatlılar" },
-              { "@type": "OfferCatalog", name: "Premium Nargile" },
             ],
           },
           areaServed: {
