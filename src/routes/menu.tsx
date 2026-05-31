@@ -176,7 +176,21 @@ function MenuPage() {
     setMenuSearch("");
   }, []);
 
-  const activeCat = liveCategories.find((c) => c.id === activeCatId);
+  const activeCat = useMemo(
+    () => liveCategories.find((c) => c.id === activeCatId) ?? null,
+    [liveCategories, activeCatId],
+  );
+
+  const displayItems = useMemo(() => {
+    const q = menuSearch.trim().toLowerCase();
+    const all = activeCat?.items ?? [];
+    if (!q) return all;
+    return all.filter(item =>
+      (item.name[language] ?? item.name["TR"] ?? "").toLowerCase().includes(q) ||
+      (item.name["TR"] ?? "").toLowerCase().includes(q),
+    );
+  }, [activeCat, menuSearch, language]);
+
   const activeCatFallback = (activeCatId ? catBg[activeCatId] : null) ?? heroImg;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -306,7 +320,7 @@ function MenuPage() {
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
               <input
-                type="search"
+                type="text"
                 value={menuSearch}
                 onChange={e => setMenuSearch(e.target.value)}
                 placeholder="Ürün ara…"
@@ -314,6 +328,7 @@ function MenuPage() {
               />
               {menuSearch && (
                 <button
+                  type="button"
                   onClick={() => setMenuSearch("")}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-colors"
                   aria-label="Aramayı temizle"
@@ -326,33 +341,32 @@ function MenuPage() {
 
           {/* Product grid */}
           <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-8 animate-cat-in contain-content">
-            {(() => {
-              const q = menuSearch.trim().toLowerCase();
-              const displayItems = q
-                ? activeCat?.items.filter(item =>
-                    (item.name[language] ?? item.name["TR"] ?? "").toLowerCase().includes(q) ||
-                    (item.name["TR"] ?? "").toLowerCase().includes(q)
-                  )
-                : activeCat?.items;
-              return displayItems && displayItems.length > 0 ? (
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {displayItems.map((item, i) => (
-                    <ProductCard
-                      key={i}
-                      item={item}
-                      language={language}
-                      onSelect={openItem}
-                      fallbackImg={activeCatFallback}
-                    />
-                  ))}
-                </ul>
-              ) : (
-                <div className="py-16 text-center">
-                  <p className="text-sm text-muted-foreground/60">"{menuSearch}" ile eşleşen ürün bulunamadı.</p>
-                  <button onClick={() => setMenuSearch("")} className="mt-3 text-xs text-primary hover:underline">Aramayı temizle</button>
-                </div>
-              );
-            })()}
+            {displayItems.length > 0 ? (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {displayItems.map((item, i) => (
+                  <ProductCard
+                    key={i}
+                    item={item}
+                    language={language}
+                    onSelect={openItem}
+                    fallbackImg={activeCatFallback}
+                  />
+                ))}
+              </ul>
+            ) : menuSearch ? (
+              <div className="py-16 text-center">
+                <p className="text-sm text-muted-foreground/60">
+                  &ldquo;{menuSearch}&rdquo; ile eşleşen ürün bulunamadı.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMenuSearch("")}
+                  className="mt-3 text-xs text-primary hover:underline"
+                >
+                  Aramayı temizle
+                </button>
+              </div>
+            ) : null}
           </section>
           <Footer />
         </div>
