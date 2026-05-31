@@ -270,17 +270,12 @@ export function useAdminItems() {
   }, []);
 
   // ── categoryOptions ───────────────────────────────────────────────────────
-  const categoryOptions = useMemo<{ id: string; title: string }[]>(() => {
-    if (items.length === 0) return CATEGORY_OPTIONS;
-    const seen = new Map<string, string>();
-    items.forEach((i) => {
-      if (i.category && !seen.has(i.category)) {
-        const match = CATEGORY_OPTIONS.find((c) => c.id === i.category);
-        seen.set(i.category, match?.title ?? i.category);
-      }
-    });
-    return [...seen.entries()].map(([id, title]) => ({ id, title }));
-  }, [items]);
+  // Always use the authoritative static slug list for the form dropdown.
+  // Deriving category IDs from DB item values caused Turkish display names
+  // ("Soğuk İçecekler") to replace slug IDs ("cold_drinks") in the select,
+  // which then stored the Turkish names back into every new insert — making
+  // the menu filter (i.category === cat.id) never match any DB product.
+  const categoryOptions = CATEGORY_OPTIONS;
 
   return { items, setItems, loading, categoryOptions, saveItem, deleteItem, toggleAvail };
 }
