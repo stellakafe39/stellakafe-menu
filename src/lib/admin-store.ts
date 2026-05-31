@@ -160,6 +160,10 @@ export function useAdminItems() {
       }
 
       // ── UPDATE ────────────────────────────────────────────────────────────
+      if (!item.id || item.id === "null" || item.id === "") {
+        console.error("saveItem UPDATE blocked: invalid id", item.id);
+        return { error: "Geçersiz ürün ID'si — güncellenemez." };
+      }
       const { error } = await supabase
         .from("menu_items")
         .update({
@@ -188,6 +192,10 @@ export function useAdminItems() {
 
   // ── deleteItem ────────────────────────────────────────────────────────────
   const deleteItem = useCallback(async (id: string): Promise<{ error?: string }> => {
+    if (!id || id === "null" || id === "") {
+      console.error("deleteItem blocked: invalid id", id);
+      return { error: "Geçersiz ürün ID'si — silinemez." };
+    }
     if (isSupabaseConfigured) {
       const { error } = await supabase
         .from("menu_items")
@@ -202,20 +210,30 @@ export function useAdminItems() {
 
   // ── toggleAvail ───────────────────────────────────────────────────────────
   const toggleAvail = useCallback(async (id: string): Promise<void> => {
+    if (!id || id === "null" || id === "") {
+      console.error("toggleAvail blocked: invalid id", id);
+      return;
+    }
+
+    // Determine next value and update local state. The Supabase call is kept
+    // OUTSIDE the state updater — React StrictMode calls updaters twice which
+    // would fire duplicate network requests if the call were inside.
+    let nextAvail: boolean | undefined;
     setItems((prev) => {
       const item = prev.find((i) => i.id === id);
       if (!item) return prev;
-      const next = !item.available;
-      if (isSupabaseConfigured) {
-        supabase
-          .from("menu_items")
-          .update({ available: next, updated_at: new Date().toISOString() })
-          .eq("id", id)
-          .then(() => {})
-          .catch(() => {});
-      }
-      return prev.map((i) => (i.id === id ? { ...i, available: next } : i));
+      nextAvail = !item.available;
+      return prev.map((i) => (i.id === id ? { ...i, available: nextAvail! } : i));
     });
+
+    if (isSupabaseConfigured && nextAvail !== undefined) {
+      supabase
+        .from("menu_items")
+        .update({ available: nextAvail, is_available: nextAvail, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .then(() => {})
+        .catch(() => {});
+    }
   }, []);
 
   // ── categoryOptions ───────────────────────────────────────────────────────
