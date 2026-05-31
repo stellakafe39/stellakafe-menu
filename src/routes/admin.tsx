@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
-  LayoutDashboard, UtensilsCrossed, Settings as Cog,
+  LayoutDashboard, UtensilsCrossed, Settings as Cog, FolderOpen,
   Menu as MenuIcon, X, LogOut, Eye, AlertTriangle, Loader2,
   Sun, Moon, ShieldCheck, Timer, Plus, Pencil, Trash2, Search,
   UploadCloud, Image as ImageIcon, Link2, Cloud, Save, CheckCircle2,
@@ -8,10 +8,11 @@ import {
 } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAdminItems, categoryTitle, type AdminItem } from "@/lib/admin-store";
+import { useLiveCategories, type AdminCategory } from "@/lib/categories-store";
 import { Toggle } from "@/components/admin/Toggle";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 
-type AdminView = "dashboard" | "menu" | "settings";
+type AdminView = "dashboard" | "menu" | "categories" | "settings";
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECS = 60;
 
@@ -468,6 +469,230 @@ function FField({ label, children }: { label: string; children: React.ReactNode 
   return <label className="block"><span className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">{label}</span>{children}</label>;
 }
 
+// ── Category View ─────────────────────────────────────────────────────────────
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+const emptyCat = (sort = 0): AdminCategory => ({
+  id: '', title_tr: '', title_bg: '', title_gr: '',
+  subtitle_tr: '', subtitle_bg: '', subtitle_gr: '',
+  cover_img: '', sort_order: sort, active: true,
+});
+
+function CategoryView() {
+  const { adminCats, loading, saveCategory, deleteCategory } = useLiveCategories();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [form, setForm] = useState<AdminCategory>(emptyCat());
+  const [isNew, setIsNew] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [drag, setDrag] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<AdminCategory | null>(null);
+
+  const openNew = () => {
+    setForm(emptyCat(adminCats.length * 10));
+    setIsNew(true);
+    setSaveError('');
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (cat: AdminCategory) => {
+    setForm({ ...cat });
+    setIsNew(false);
+    setSaveError('');
+    setDrawerOpen(true);
+  };
+
+  const set = (patch: Partial<AdminCategory>) => setForm(f => ({ ...f, ...patch }));
+
+  const handleFile = async (file?: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      set({ cover_img: url });
+    } catch (e) { setSaveError(e instanceof Error ? e.message : 'Yükleme hatası'); }
+    finally { setUploading(false); }
+  };
+
+  const submit = async () => {
+    if (!form.title_tr.trim()) { setSaveError('Kategori adı zorunlu.'); return; }
+    const id = isNew ? (form.id.trim() || slugify(form.title_tr)) : form.id;
+    if (!id) { setSaveError('Kategori ID oluşturulamadı.'); return; }
+    setSaving(true); setSaveError('');
+    const res = await saveCategory({ ...form, id });
+    if (res.error) setSaveError(res.error); else setDrawerOpen(false);
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const res = await deleteCategory(id);
+    if (res.error) setSaveError(res.error);
+    setConfirmDelete(null);
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p className="font-sans text-[9px] tracking-[0.5em] uppercase text-primary/60 mb-1">Stella Lounge</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-light text-foreground">Kategori Yönetimi</h1>
+          <p className="text-sm text-muted-foreground mt-1">{adminCats.length} kayıtlı kategori</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <button onClick={openNew} className="inline-flex items-center gap-2 bg-primary text-black px-5 py-2.5 rounded-lg text-sm font-bold hover:opacity-90 transition-all">
+            <Plus className="h-4 w-4" /> Yeni Kategori
+          </button>
+          {!isSupabaseConfigured && (
+            <p className="text-[10px] text-amber-500 text-center">Supabase bağlı değil — sadece görüntüleme</p>
+          )}
+        </div>
+      </div>
+
+      {adminCats.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-12 text-center">
+          <p className="text-sm text-muted-foreground mb-2">Henüz kategori oluşturulmamış.</p>
+          <p className="text-xs text-muted-foreground/60">
+            Önce <code className="bg-muted px-1 rounded text-xs">supabase-categories-migration.sql</code> dosyasını Supabase SQL Editor'da çalıştırın.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {adminCats.map(cat => (
+            <div key={cat.id} className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-all group">
+              <div className="relative h-32 overflow-hidden bg-muted">
+                {cat.cover_img
+                  ? <img src={cat.cover_img} alt={cat.title_tr} className="h-full w-full object-cover" loading="lazy" />
+                  : <div className="h-full w-full flex items-center justify-center"><ImageIcon className="h-8 w-8 text-muted-foreground/30" /></div>}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className={`absolute top-2.5 right-2.5 h-2 w-2 rounded-full ${cat.active ? "bg-emerald-400" : "bg-red-400"}`} />
+              </div>
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <h3 className="font-display text-base text-foreground font-light leading-snug">{cat.title_tr}</h3>
+                  <span className="font-mono text-[9px] text-muted-foreground/50 shrink-0">#{cat.sort_order}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground/60 mb-1 truncate">{cat.subtitle_tr}</p>
+                <code className="text-[9px] text-primary/50 bg-muted/40 px-1.5 py-0.5 rounded">{cat.id}</code>
+                <div className="flex items-center gap-2 mt-3">
+                  <button onClick={() => openEdit(cat)} className="flex-1 text-xs border border-border rounded-lg py-1.5 text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5">
+                    <Pencil className="h-3 w-3" /> Düzenle
+                  </button>
+                  <button onClick={() => setConfirmDelete(cat)} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors border border-border">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Drawer */}
+      <div className={`fixed inset-0 z-40 bg-black/65 transition-opacity duration-300 ${drawerOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={() => setDrawerOpen(false)} />
+      <aside className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] bg-background border-l border-border shadow-2xl transition-transform duration-300 ${drawerOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
+        <div className="h-16 px-6 flex items-center justify-between border-b border-border shrink-0">
+          <h2 className="font-display text-lg text-foreground">{isNew ? "Yeni Kategori" : "Kategoriyi Düzenle"}</h2>
+          <button onClick={() => setDrawerOpen(false)} className="p-2 rounded-lg hover:bg-muted/40 text-muted-foreground"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <FField label="Kategori Adı (TR) *">
+            <input value={form.title_tr} onChange={e => {
+              set({ title_tr: e.target.value, ...(isNew ? { id: slugify(e.target.value) } : {}) });
+            }} placeholder="Soğuk İçecekler" className="adm-inp" autoFocus />
+          </FField>
+
+          {isNew && (
+            <FField label="ID (otomatik — değiştirebilirsiniz)">
+              <input value={form.id} onChange={e => set({ id: e.target.value })} placeholder="soguk_icecekler" className="adm-inp font-mono" />
+            </FField>
+          )}
+
+          <FField label="Alt Başlık (TR)">
+            <input value={form.subtitle_tr} onChange={e => set({ subtitle_tr: e.target.value })} placeholder="Serinletici içecekler" className="adm-inp" />
+          </FField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FField label="Ad (BG)"><input value={form.title_bg} onChange={e => set({ title_bg: e.target.value })} placeholder="Boş = TR" className="adm-inp" /></FField>
+            <FField label="Ad (GR)"><input value={form.title_gr} onChange={e => set({ title_gr: e.target.value })} placeholder="Boş = TR" className="adm-inp" /></FField>
+          </div>
+
+          <div className="space-y-2">
+            <span className="block text-[10px] uppercase tracking-widest text-muted-foreground">Kapak Görseli</span>
+            <div onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+              onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]); }}
+              className={`rounded-xl border-2 border-dashed transition-all ${drag ? "border-primary bg-primary/5" : "border-border/60 bg-muted/20"}`}>
+              {form.cover_img
+                ? (
+                  <div className="p-3 flex items-center gap-3">
+                    <img src={form.cover_img} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground truncate">{form.cover_img.length > 50 ? form.cover_img.slice(0, 50) + '…' : form.cover_img}</p>
+                    </div>
+                    <button onClick={() => set({ cover_img: '' })} className="text-xs text-red-400 hover:underline shrink-0">Kaldır</button>
+                  </div>
+                )
+                : (
+                  <label className="flex flex-col items-center py-8 cursor-pointer">
+                    {uploading ? <Loader2 className="h-7 w-7 text-primary animate-spin mb-2" /> : <UploadCloud className="h-7 w-7 text-primary mb-2" />}
+                    <span className="text-sm text-foreground">{uploading ? "Yükleniyor…" : <><span>Sürükleyin veya </span><span className="text-primary underline">göz atın</span></>}</span>
+                    {!isCloudinaryConfigured && !uploading && <span className="text-[10px] text-amber-500 mt-1">Cloudinary ayarlanmamış — .env dosyasına ekleyin</span>}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files?.[0])} disabled={uploading} />
+                  </label>
+                )}
+            </div>
+            <input
+              type="url"
+              value={form.cover_img}
+              onChange={e => set({ cover_img: e.target.value })}
+              placeholder="veya doğrudan URL girin: https://..."
+              className="adm-inp text-xs"
+            />
+          </div>
+
+          <FField label="Sıra No">
+            <input type="number" value={form.sort_order} onChange={e => set({ sort_order: Number(e.target.value) })} className="adm-inp" />
+          </FField>
+
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
+            <div><div className="text-sm text-foreground">Aktif</div><div className="text-xs text-muted-foreground mt-0.5">{form.active ? "Menüde görünür" : "Gizli"}</div></div>
+            <Toggle checked={form.active} onChange={v => set({ active: v })} />
+          </div>
+
+          {saveError && <p className="text-sm text-red-400 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{saveError}</p>}
+          <style>{`.adm-inp{width:100%;background:var(--background);border:1px solid var(--border);border-radius:.5rem;padding:.5rem .75rem;font-size:.875rem;color:var(--foreground);transition:border-color .2s}.adm-inp:focus{outline:none;border-color:var(--primary)}.adm-inp::placeholder{color:var(--muted-foreground);opacity:.6}.adm-inp option{background:var(--card);color:var(--foreground)}`}</style>
+        </div>
+        <div className="p-6 border-t border-border flex gap-3 shrink-0">
+          <button onClick={() => setDrawerOpen(false)} className="flex-1 border border-border text-foreground rounded-lg py-2.5 text-sm hover:bg-muted/40 transition-colors">İptal</button>
+          <button onClick={submit} disabled={saving || uploading} className="flex-1 bg-primary text-black rounded-lg py-2.5 text-sm font-bold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Kaydediliyor…" : isNew ? "Oluştur" : "Kaydet"}
+          </button>
+        </div>
+      </aside>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75" onClick={() => setConfirmDelete(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-lg text-foreground">Kategoriyi sil?</h3>
+            <p className="text-sm text-muted-foreground mt-2">"{confirmDelete.title_tr}" kategorisi Supabase'den silinecek. Ürünler etkilenmez.</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 border border-border rounded-lg py-2.5 text-sm text-foreground hover:bg-muted/40 transition-colors">İptal</button>
+              <button onClick={() => handleDelete(confirmDelete.id)} className="flex-1 bg-red-500/90 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-red-500">Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Settings View ─────────────────────────────────────────────────────────────
 type SettingsMap = { venue_name: string; phone: string; instagram: string; address: string; hours_weekday: string; hours_weekend: string; maintenance_mode: string };
 const settingsDefaults: SettingsMap = {
@@ -585,9 +810,10 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
   const adminData = useAdminItems();
 
   const nav = [
-    { id: "dashboard" as AdminView, label: "Kontrol Paneli", icon: LayoutDashboard },
-    { id: "menu" as AdminView, label: "Menü Yönetimi", icon: UtensilsCrossed },
-    { id: "settings" as AdminView, label: "Ayarlar", icon: Cog },
+    { id: "dashboard"  as AdminView, label: "Kontrol Paneli",    icon: LayoutDashboard },
+    { id: "menu"       as AdminView, label: "Menü Yönetimi",     icon: UtensilsCrossed },
+    { id: "categories" as AdminView, label: "Kategoriler",        icon: FolderOpen },
+    { id: "settings"   as AdminView, label: "Ayarlar",           icon: Cog },
   ];
 
   return (
@@ -659,9 +885,10 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
           </div>
         </header>
         <main className="flex-1 p-4 lg:p-8 overflow-x-hidden overflow-y-auto">
-          {view === "dashboard" && <DashboardView {...adminData} setView={setView} />}
-          {view === "menu" && <MenuView {...adminData} />}
-          {view === "settings" && <SettingsView />}
+          {view === "dashboard"  && <DashboardView {...adminData} setView={setView} />}
+          {view === "menu"       && <MenuView {...adminData} />}
+          {view === "categories" && <CategoryView />}
+          {view === "settings"   && <SettingsView />}
         </main>
       </div>
     </div>
@@ -678,7 +905,7 @@ function AdminRoot() {
     let active = true;
     const timer = setTimeout(() => { if (active) setAuthChecked(true); }, 4000);
     supabase.auth.getSession()
-      .then(({ data }) => { if (!active) return; clearTimeout(timer); setSession(data?.session ?? null); setAuthChecked(true); })
+      .then(({ data }: { data: { session: unknown } }) => { if (!active) return; clearTimeout(timer); setSession(data?.session ?? null); setAuthChecked(true); })
       .catch(() => { if (!active) return; clearTimeout(timer); setAuthChecked(true); });
     return () => { active = false; clearTimeout(timer); };
   }, []);

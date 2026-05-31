@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, memo, useMemo, useEffect, useCallback, useRef } from "react";
-import { categories, type Item } from "@/lib/menu-data";
+import { type Item } from "@/lib/menu-data";
 import { useAdminItems } from "@/lib/admin-store";
+import { useLiveCategories } from "@/lib/categories-store";
 import { useLanguage } from "@/lib/i18n";
 import { Navbar } from "@/components/Navbar";
 import {
@@ -16,22 +17,6 @@ import {
 import { Footer } from "@/components/Footer";
 import { X } from "lucide-react";
 
-import c1Img from "@/assets/c1.jpg";
-import c2Img from "@/assets/c2.jpg";
-import d1Img from "@/assets/d1.jpg";
-import g1Img from "@/assets/g1.jpg";
-import g2Img from "@/assets/g2.jpg";
-import h1Img from "@/assets/h1.jpg";
-import h2Img from "@/assets/h2.jpg";
-import h3Img from "@/assets/h3.jpg";
-import h4Img from "@/assets/h4.jpg";
-import h5Img from "@/assets/h5.jpg";
-import r1Img from "@/assets/r1.jpg";
-import r2Img from "@/assets/r2.jpg";
-import r3Img from "@/assets/r3.jpg";
-import r4Img from "@/assets/r4.jpg";
-import r5Img from "@/assets/r5.jpg";
-import s1Img from "@/assets/s1.jpg";
 import heroImg from "@/assets/hero.jpg";
 
 export const Route = createFileRoute("/menu")({
@@ -45,22 +30,22 @@ export const Route = createFileRoute("/menu")({
 });
 
 const catBg: Record<string, string> = {
-  snacks:          r1Img,
-  toasts_burgers:  r2Img,
-  pasta_pizzas:    r3Img,
-  main_courses:    r4Img,
-  salads:          r5Img,
-  breakfast_soups: h1Img,
-  desserts:        d1Img,
-  hot_drinks:      h2Img,
-  turkish_coffee:  h3Img,
-  espresso:        h4Img,
-  hot_choco:       h5Img,
-  cold_coffee:     c1Img,
-  frappe:          c2Img,
-  cold_drinks:     g1Img,
-  cocktails:       g2Img,
-  shisha:          s1Img,
+  snacks:          '/categories/atistirmaliklar.png',
+  toasts_burgers:  '/categories/tostlar-burgerler.png',
+  pasta_pizzas:    '/categories/makarnalar-pizzalar.png',
+  main_courses:    '/categories/ana-yemekler-izgaralar.png',
+  salads:          '/categories/salatalar.png',
+  breakfast_soups: '/categories/corbalar-kahvalti.png',
+  desserts:        '/categories/tatlilar.png',
+  hot_drinks:      '/categories/sicak-icecekler.png',
+  turkish_coffee:  '/categories/kumda-turk-kahveleri.png',
+  espresso:        '/categories/espresso-bazli-kahveler.png',
+  hot_choco:       '/categories/sicak-cikolatalar.png',
+  cold_coffee:     '/categories/soguk-kahveler.png',
+  frappe:          '/categories/frappeler.png',
+  cold_drinks:     '/categories/soguk-icecekler-frozen.png',
+  cocktails:       '/categories/cocktails.jpg',
+  shisha:          '/categories/shisha.jpg',
 };
 
 const iconFor: Record<string, React.FC<{ className?: string }>> = {
@@ -82,26 +67,6 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
   shisha:          ShishaIcon,
 };
 
-const CAT_STORAGE_SLUG: Record<string, string> = {
-  snacks:          'atistirmaliklar',
-  toasts_burgers:  'tostlar-ve-burgerler',
-  pasta_pizzas:    'pizzalar',
-  main_courses:    'etler-ve-izgaralar',
-  salads:          'salatalar',
-  breakfast_soups: 'corbalar-kahvalti',
-  desserts:        'tatlilar',
-  hot_drinks:      'sicak-icecekler',
-  turkish_coffee:  'kahveler',
-  espresso:        'kahveler',
-  hot_choco:       'sicak-cikolatalar',
-  cold_coffee:     'soguk-icecekler',
-  frappe:          'soguk-icecekler',
-  cold_drinks:     'soguk-icecekler',
-  cocktails:       'soguk-icecekler',
-  shisha:          '',
-};
-
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
 
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
@@ -109,6 +74,7 @@ function MenuPage() {
   const [displayItem, setDisplayItem] = useState<Item | null>(null);
   const { language } = useLanguage();
   const { items: dbItems } = useAdminItems();
+  const { liveCategories: baseCategories } = useLiveCategories();
 
   // Refs for the sheet panel (swipe-to-close)
   const sheetRef   = useRef<HTMLDivElement>(null);
@@ -166,9 +132,9 @@ function MenuPage() {
     touchDragY.current  = 0;
   };
 
-  // ── Data ──────────────────────────────────────────────────────────────────
+  // ── Data: merge category list with live item images from Supabase ──────────
   const liveCategories = useMemo(() => {
-    if (!dbItems.length) return categories;
+    if (!dbItems.length) return baseCategories;
 
     const imgByName = new Map<string, string>();
     for (const item of dbItems) {
@@ -191,29 +157,21 @@ function MenuPage() {
       return fallback;
     };
 
-    return categories.map(staticCat => ({
-      ...staticCat,
-      items: staticCat.items.map(item => ({
-        ...item,
-        img: resolveImg(item.name.TR, item.img),
-      })),
+    return baseCategories.map(cat => ({
+      ...cat,
+      items: cat.items.length
+        ? cat.items.map(item => ({ ...item, img: resolveImg(item.name.TR, item.img) }))
+        // DB-only categories: populate items from menu_items table
+        : dbItems
+            .filter(i => i.category === cat.id && i.available)
+            .map(i => ({
+              name: { TR: i.name, BG: i.name_bg || i.name, GR: i.name_gr || i.name },
+              desc: { TR: i.desc, BG: i.desc_bg || i.desc, GR: i.desc_gr || i.desc },
+              price: i.price,
+              img: i.img,
+            })),
     }));
-  }, [dbItems]);
-
-  const catStorageUrls = useMemo(() =>
-    SUPABASE_URL
-      ? Object.fromEntries(
-          categories.map(c => [
-            c.id,
-            CAT_STORAGE_SLUG[c.id]
-              ? `${SUPABASE_URL}/storage/v1/object/public/menu-images/categories/${CAT_STORAGE_SLUG[c.id]}.jpg`
-              : '',
-          ])
-        )
-      : {} as Record<string, string>,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  }, [dbItems, baseCategories]);
 
   const handleSetCat = useCallback((id: string | null) => {
     setActiveCatId(id);
@@ -239,10 +197,9 @@ function MenuPage() {
           <section className="mx-auto w-full max-w-5xl px-4 sm:px-6 pb-8 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
               {liveCategories.map((cat, i) => {
-                const Icon       = iconFor[cat.id] ?? PlateIcon;
-                const fallbackBg = catBg[cat.id] ?? heroImg;
-                const storageBg  = catStorageUrls[cat.id] ?? '';
-                const title      = cat.title?.[language] || cat.title?.["TR"];
+                const Icon   = iconFor[cat.id] ?? PlateIcon;
+                const imgSrc = cat.cover_img || catBg[cat.id] || heroImg;
+                const title  = cat.title?.[language] || cat.title?.["TR"];
 
                 return (
                   <button
@@ -253,8 +210,7 @@ function MenuPage() {
                     aria-label={title}
                   >
                     <img
-                      src={storageBg || fallbackBg}
-                      onError={(e) => { const el = e.target as HTMLImageElement; if (el.getAttribute('src') !== fallbackBg) el.src = fallbackBg; }}
+                      src={imgSrc}
                       alt={title}
                       loading="lazy"
                       decoding="async"
@@ -298,11 +254,10 @@ function MenuPage() {
 
               <div className="flex gap-2 overflow-x-auto no-scrollbar">
                 {liveCategories.map((cat) => {
-                  const active     = activeCatId === cat.id;
-                  const fallbackBg = catBg[cat.id] ?? heroImg;
-                  const storageBg  = catStorageUrls[cat.id] ?? '';
-                  const Icon       = iconFor[cat.id] ?? PlateIcon;
-                  const title      = cat.title?.[language] || cat.title?.["TR"];
+                  const active   = activeCatId === cat.id;
+                  const imgSrc   = cat.cover_img || catBg[cat.id] || heroImg;
+                  const Icon     = iconFor[cat.id] ?? PlateIcon;
+                  const title    = cat.title?.[language] || cat.title?.["TR"];
                   return (
                     <button
                       key={cat.id}
@@ -312,8 +267,7 @@ function MenuPage() {
                       style={{ width: 54, height: 70 }}
                     >
                       <img
-                        src={storageBg || fallbackBg}
-                        onError={(e) => { const el = e.target as HTMLImageElement; if (el.getAttribute('src') !== fallbackBg) el.src = fallbackBg; }}
+                        src={imgSrc}
                         alt=""
                         className="absolute inset-0 h-full w-full object-cover"
                         loading="lazy"

@@ -9,6 +9,7 @@ export type Category = {
   id: string;
   title: Record<string, string>;
   subtitle: Record<string, string>;
+  cover_img?: string;
   items: Item[];
 };
 

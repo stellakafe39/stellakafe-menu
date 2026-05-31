@@ -1,38 +1,43 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════╗
  * ║   Stella Lounge — AI Menu Image Generator                     ║
- * ║   Google Imagen 3 → Supabase Storage → menu_items.img_url     ║
+ * ║   Pollinations AI → Supabase Storage → menu_items.img_url     ║
  * ╚═══════════════════════════════════════════════════════════════╝
  *
  * Usage:
  *   node --env-file=.env generate-menu-images.js
  *
  * Required .env keys:
- *   GOOGLE_API_KEY              — Google AI Studio API key
  *   VITE_SUPABASE_URL           — Your Supabase project URL
  *   VITE_SUPABASE_SERVICE_KEY   — Supabase service_role key (NOT anon key)
  *
  * What it does:
  *   1. Fetches all menu_items from Supabase
- *   2. Generates an AI image for each product + each category via Imagen 3
+ *   2. Generates an AI image for each product + each category via Pollinations AI (free)
  *   3. Uploads images to Supabase Storage bucket "menu-images"
  *   4. Updates menu_items.img_url and updated_at with the public Storage URL
  *   5. Skips items whose local JPG file already exists (safe resume)
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import fs   from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require   = createRequire(import.meta.url);
+
+// English prompt mappings — keys are exact name_tr values from Supabase
+const ENGLISH_PROMPTS = require('./english-prompts.json');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const CONFIG = {
-  model:         'imagen-3.0-generate-001',
-  delayMs:       10_000,   // 10s between requests
-  storageBucket: 'menu-images',
+  pollinationsUrl: 'https://image.pollinations.ai/prompt',
+  imageWidth:      1024,
+  imageHeight:     1024,
+  delayMs:         10_000,   // 10s between requests
+  storageBucket:   'menu-images',
   outputDirs: {
     categories: path.join(__dirname, 'generated-images', 'categories'),
     products:   path.join(__dirname, 'generated-images', 'products'),
@@ -40,14 +45,27 @@ const CONFIG = {
 };
 
 // ─── Prompt ───────────────────────────────────────────────────────────────────
-function buildPrompt(name) {
+function resolveEnglishDescription(name, jobType) {
+  if (jobType === 'category') {
+    return ENGLISH_PROMPTS.categories[name] ?? `${name} food category`;
+  }
+  // Exact match first; then try without trailing size-variant parentheses
+  if (ENGLISH_PROMPTS.items[name]) return ENGLISH_PROMPTS.items[name];
+  const baseName = name.replace(/\s*\(.*?\)\s*$/, '').trim();
+  if (ENGLISH_PROMPTS.items[baseName]) return ENGLISH_PROMPTS.items[baseName];
+  // No mapping found — fall back to name as-is and warn
+  console.warn(`  ⚠  No English mapping for "${name}" — using Turkish name as fallback`);
+  return name;
+}
+
+function buildPrompt(name, jobType = 'product') {
+  const englishDesc = resolveEnglishDescription(name, jobType);
   return (
-    `Ultra-realistic, raw documentary-style food photography of a single portion of ${name}. ` +
+    `Ultra-realistic, raw documentary-style food photography of a single portion of ${englishDesc}. ` +
     `Styled exactly as served in a traditional Turkish restaurant or cafe, specifically captured ` +
     `for a digital food menu. Completely isolated on a pure solid black background (#000000). ` +
-    `STRICTLY NO extra decorations, NO props, NO scattered ingredients, NO mint leaves, NO ice ` +
-    `(unless it is explicitly a cold drink). Just the highly realistic, culturally accurate food ` +
-    `or beverage perfectly centered.`
+    `STRICTLY NO extra decorations, NO props, NO scattered ingredients, NO mint leaves, NO ice. ` +
+    `Just the highly realistic food perfectly centered.`
   );
 }
 
@@ -85,24 +103,21 @@ const skip = m => console.log(`  ${C.yellow}⊘${C.reset}  ${m}`);
 const fail = m => console.log(`  ${C.red}✖${C.reset}  ${m}`);
 const info = m => console.log(`  ${C.blue}ℹ${C.reset}  ${m}`);
 
-// ─── Google Imagen 3 ──────────────────────────────────────────────────────────
-async function generateGoogleImage(ai, prompt) {
-  const response = await ai.models.generateImages({
-    model:  CONFIG.model,
-    prompt,
-    config: {
-      numberOfImages: 1,
-      aspectRatio:    '1:1',
-      outputMimeType: 'image/jpeg',
-    },
-  });
+// ─── Pollinations AI ──────────────────────────────────────────────────────────
+async function generatePollinationsImage(prompt) {
+  const encoded = encodeURIComponent(prompt);
+  const seed    = Math.floor(Math.random() * 1_000_000);
+  const url     = `${CONFIG.pollinationsUrl}/${encoded}` +
+                  `?width=${CONFIG.imageWidth}&height=${CONFIG.imageHeight}` +
+                  `&seed=${seed}&nologo=true&model=flux`;
 
-  const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
-  if (!imageBytes) {
-    throw new Error('Imagen returned no image bytes');
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Pollinations request failed: ${response.status} ${response.statusText}`);
   }
 
-  return Buffer.from(imageBytes, 'base64');
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 // ─── Supabase Storage helpers ─────────────────────────────────────────────────
@@ -135,7 +150,7 @@ async function uploadToStorage(supabase, storagePath, buffer, contentType = 'ima
 }
 
 // ─── Core generator ───────────────────────────────────────────────────────────
-async function generateOne(ai, supabase, { id, name, jobType, outputDir, index, total }) {
+async function generateOne(supabase, { id, name, jobType, outputDir, index, total }) {
   const slug        = slugify(name);
   const outFile     = path.join(outputDir, `${slug}.jpg`);
   const storagePath = `${jobType === 'category' ? 'categories' : 'products'}/${slug}.jpg`;
@@ -150,12 +165,12 @@ async function generateOne(ai, supabase, { id, name, jobType, outputDir, index, 
     return { name, slug, status: 'skipped' };
   }
 
-  const prompt = buildPrompt(name);
+  const prompt = buildPrompt(name, jobType);
   console.log(`  ${C.dim}Prompt: "${prompt.slice(0, 90)}…"${C.reset}`);
 
   try {
-    process.stdout.write(`  ${C.dim}Generating via Imagen 3…${C.reset}`);
-    const buffer = await generateGoogleImage(ai, prompt);
+    process.stdout.write(`  ${C.dim}Generating via Pollinations AI…${C.reset}`);
+    const buffer = await generatePollinationsImage(prompt);
     process.stdout.write(` ${C.green}done${C.reset}\n`);
 
     fs.writeFileSync(outFile, buffer);
@@ -188,12 +203,11 @@ async function generateOne(ai, supabase, { id, name, jobType, outputDir, index, 
 async function main() {
   console.log('\n' + box('━'.repeat(58)));
   console.log(box('  🍽   Stella Lounge — AI Menu Image Generator'));
-  console.log(box('  🎨   Powered by Google Imagen 3'));
+  console.log(box('  🎨   Powered by Pollinations AI (free)'));
   console.log(box('━'.repeat(58)) + '\n');
 
   // Validate env
   const REQUIRED_ENV = {
-    GOOGLE_API_KEY:            process.env.GOOGLE_API_KEY,
     VITE_SUPABASE_URL:         process.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY,
   };
@@ -205,14 +219,12 @@ async function main() {
     process.exit(1);
   }
 
-  const ai = new GoogleGenAI({ apiKey: REQUIRED_ENV.GOOGLE_API_KEY });
-
   const supabase = createClient(
     REQUIRED_ENV.VITE_SUPABASE_URL,
     REQUIRED_ENV.VITE_SUPABASE_SERVICE_KEY,
   );
 
-  info(`Model    : ${C.bold}${CONFIG.model}${C.reset}`);
+  info(`Provider : ${C.bold}Pollinations AI (free, no API key needed)${C.reset}`);
   info(`Delay    : ${C.bold}${CONFIG.delayMs / 1000}s${C.reset} between requests`);
   info(`Bucket   : ${C.bold}${CONFIG.storageBucket}${C.reset}\n`);
 
@@ -282,7 +294,7 @@ async function main() {
   const results = [];
   for (let i = 0; i < allJobs.length; i++) {
     const job    = allJobs[i];
-    const result = await generateOne(ai, supabase, { ...job, index: i + 1, total });
+    const result = await generateOne(supabase, { ...job, index: i + 1, total });
     results.push(result);
 
     const isLast     = i === allJobs.length - 1;

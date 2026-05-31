@@ -31,6 +31,7 @@ export const Route = createFileRoute("/")({
     ],
     links: [
       { rel: "preload", as: "image", href: heroImg },
+      { rel: "preload", as: "video", href: "/hero-video.mp4", type: "video/mp4" },
     ],
   }),
 });
@@ -47,17 +48,20 @@ function Landing() {
       ══════════════════════════════════════════ */}
       <section className="relative min-h-[100svh] w-full flex flex-col items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img
-            src={heroImg}
-            alt="Stella Cafe & Lounge iç mekan"
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            poster={heroImg}
             className="h-full w-full object-cover"
-            style={{ transform: "scale(1.04)" }}
-            fetchPriority="high"
-            decoding="async"
-            width={1920}
-            height={1080}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/40 to-background" />
+            aria-hidden="true"
+          >
+            <source src="/hero-video.mp4" type="video/mp4" />
+            {/* Fallback for browsers that don't support video */}
+            <img src={heroImg} alt="Stella Cafe & Lounge iç mekan" className="h-full w-full object-cover" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-background" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/20 via-transparent to-background/20" />
         </div>
 
