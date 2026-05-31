@@ -169,15 +169,11 @@ export function useAdminItems() {
       }
 
       // ── INSERT ───────────────────────────────────────────────────────────
-      // isNew=true: the form has NO database UUID yet. isValidDbId is NOT
-      // called here — that gate is strictly for UPDATE / DELETE / TOGGLE.
-      // We chain .select().single() so Supabase returns the created row
-      // (including the DB-generated UUID) in one round-trip, removing the
-      // need for a separate fetchFromDB() call that could wipe local state.
+      // isNew=true: no database UUID yet — isValidDbId is NOT applied here.
       if (isNew) {
-        const { data: created, error } = await (supabase
+        const { error } = await supabase
           .from("menu_items")
-          .insert({
+          .insert([{
             name_tr:      item.name,
             name_bg:      item.name_bg  || item.name,
             name_gr:      item.name_gr  || item.name,
@@ -189,20 +185,9 @@ export function useAdminItems() {
             img_url:      item.img,
             available:    true,
             is_available: true,
-          })
-          .select()
-          .single() as Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>);
-
+          }]);
         if (error) return { error: error.message };
-
-        // Prepend the newly created row (with its real UUID) to local state.
-        // Fall back to a full re-fetch only if Supabase didn't return the row.
-        const newItem = created ? mapRow(created) : null;
-        if (newItem) {
-          setItems((prev) => [newItem, ...prev]);
-        } else {
-          await fetchFromDB();
-        }
+        await fetchFromDB();
         return {};
       }
 
