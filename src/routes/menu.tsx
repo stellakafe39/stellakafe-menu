@@ -14,7 +14,7 @@ import {
   PlateIcon,
 } from "@/components/Icons";
 import { Footer } from "@/components/Footer";
-import { X } from "lucide-react";
+import { X, Search } from "lucide-react";
 
 import heroImg from "@/assets/hero.jpg";
 
@@ -67,6 +67,7 @@ const iconFor: Record<string, React.FC<{ className?: string }>> = {
 
 function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [menuSearch, setMenuSearch]   = useState("");
   const [isOpen, setIsOpen]           = useState(false);
   const [displayItem, setDisplayItem] = useState<Item | null>(null);
   const { language } = useLanguage();
@@ -172,6 +173,7 @@ function MenuPage() {
 
   const handleSetCat = useCallback((id: string | null) => {
     setActiveCatId(id);
+    setMenuSearch("");
   }, []);
 
   const activeCat = liveCategories.find((c) => c.id === activeCatId);
@@ -299,19 +301,58 @@ function MenuPage() {
             <div className="h-px w-8 bg-primary/35 mx-auto mt-4" />
           </div>
 
+          {/* Menu search bar */}
+          <div className="mx-auto w-full max-w-2xl px-4 mb-4">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
+              <input
+                type="search"
+                value={menuSearch}
+                onChange={e => setMenuSearch(e.target.value)}
+                placeholder="Ürün ara…"
+                className="w-full bg-card border border-border/50 rounded-full pl-10 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/60 transition-colors placeholder:text-muted-foreground/40"
+              />
+              {menuSearch && (
+                <button
+                  onClick={() => setMenuSearch("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-colors"
+                  aria-label="Aramayı temizle"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Product grid */}
           <section key={activeCatId} className="mx-auto w-full max-w-2xl px-4 pb-8 animate-cat-in contain-content">
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {activeCat?.items.map((item, i) => (
-                <ProductCard
-                  key={i}
-                  item={item}
-                  language={language}
-                  onSelect={openItem}
-                  fallbackImg={activeCatFallback}
-                />
-              ))}
-            </ul>
+            {(() => {
+              const q = menuSearch.trim().toLowerCase();
+              const displayItems = q
+                ? activeCat?.items.filter(item =>
+                    (item.name[language] ?? item.name["TR"] ?? "").toLowerCase().includes(q) ||
+                    (item.name["TR"] ?? "").toLowerCase().includes(q)
+                  )
+                : activeCat?.items;
+              return displayItems && displayItems.length > 0 ? (
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {displayItems.map((item, i) => (
+                    <ProductCard
+                      key={i}
+                      item={item}
+                      language={language}
+                      onSelect={openItem}
+                      fallbackImg={activeCatFallback}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <div className="py-16 text-center">
+                  <p className="text-sm text-muted-foreground/60">"{menuSearch}" ile eşleşen ürün bulunamadı.</p>
+                  <button onClick={() => setMenuSearch("")} className="mt-3 text-xs text-primary hover:underline">Aramayı temizle</button>
+                </div>
+              );
+            })()}
           </section>
           <Footer />
         </div>

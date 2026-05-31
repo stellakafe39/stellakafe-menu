@@ -248,11 +248,11 @@ type FormState = {
   id?: string; name: string; name_bg: string; name_gr: string;
   desc: string; desc_bg: string; desc_gr: string;
   category: string; price: string; img: string;
-  available: boolean; sort_order: number;
+  available: boolean;
 };
-const emptyForm = (sort = 0, cat = ""): FormState => ({
+const emptyForm = (cat = ""): FormState => ({
   name: "", name_bg: "", name_gr: "", desc: "", desc_bg: "", desc_gr: "",
-  category: cat, price: "", img: "", available: true, sort_order: sort,
+  category: cat, price: "", img: "", available: true,
 });
 
 function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggleAvail }: ReturnType<typeof useAdminItems>) {
@@ -273,9 +273,9 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
       i.name.toLowerCase().includes(query.toLowerCase())
     ), [items, query, filterCat]);
 
-  const openNew = () => { setForm(emptyForm(items.length * 10, categoryOptions[0]?.id ?? "")); setDrawerOpen(true); };
+  const openNew = () => { setForm(emptyForm(categoryOptions[0]?.id ?? "")); setDrawerOpen(true); };
   const openEdit = (it: AdminItem) => {
-    setForm({ id: it.id, name: it.name, name_bg: it.name_bg, name_gr: it.name_gr, desc: it.desc, desc_bg: it.desc_bg, desc_gr: it.desc_gr, category: it.category, price: it.price, img: it.img, available: it.available, sort_order: it.sort_order });
+    setForm({ id: it.id, name: it.name, name_bg: it.name_bg, name_gr: it.name_gr, desc: it.desc, desc_bg: it.desc_bg, desc_gr: it.desc_gr, category: it.category, price: it.price, img: it.img, available: it.available });
     setDrawerOpen(true);
   };
   const closeDrawer = () => { setDrawerOpen(false); setSaveError(""); };
@@ -297,7 +297,7 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
       id: form.id ?? `new-${Date.now()}`,
       name: form.name, name_bg: form.name_bg || form.name, name_gr: form.name_gr || form.name,
       desc: form.desc, desc_bg: form.desc_bg || form.desc, desc_gr: form.desc_gr || form.desc,
-      category: form.category, price: form.price, img: form.img, available: form.available, sort_order: form.sort_order,
+      category: form.category, price: form.price, img: form.img, available: form.available,
     };
     const res = await saveItem(item);
     if (res.error) setSaveError(res.error); else closeDrawer();
@@ -305,7 +305,9 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
   };
 
   const handleDelete = useCallback(async (id: string) => {
-    await deleteItem(id); setConfirmDelete(null);
+    const res = await deleteItem(id);
+    if (res?.error) { setSaveError(res.error); }
+    setConfirmDelete(null);
   }, [deleteItem]);
 
   const set = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }));
@@ -433,7 +435,6 @@ function MenuView({ items, loading, categoryOptions, saveItem, deleteItem, toggl
             </FField>
             <FField label="Fiyat"><input value={form.price} onChange={e => set({ price: e.target.value })} placeholder="200 ₺" className="adm-inp" /></FField>
           </div>
-          <FField label="Sıra"><input type="number" value={form.sort_order} onChange={e => set({ sort_order: Number(e.target.value) })} className="adm-inp" /></FField>
           <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
             <div><div className="text-sm text-foreground">Durum</div><div className="text-xs text-muted-foreground mt-0.5">{form.available ? "Menüde görünür" : "Tükendi"}</div></div>
             <Toggle checked={form.available} onChange={v => set({ available: v })} />
@@ -477,10 +478,10 @@ function slugify(text: string) {
     .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-const emptyCat = (sort = 0): AdminCategory => ({
+const emptyCat = (): AdminCategory => ({
   id: '', title_tr: '', title_bg: '', title_gr: '',
   subtitle_tr: '', subtitle_bg: '', subtitle_gr: '',
-  cover_img: '', sort_order: sort, active: true,
+  cover_img: '', sort_order: 0, active: true,
 });
 
 function CategoryView() {
@@ -495,7 +496,7 @@ function CategoryView() {
   const [confirmDelete, setConfirmDelete] = useState<AdminCategory | null>(null);
 
   const openNew = () => {
-    setForm(emptyCat(adminCats.length * 10));
+    setForm(emptyCat());
     setIsNew(true);
     setSaveError('');
     setDrawerOpen(true);
@@ -656,10 +657,6 @@ function CategoryView() {
               className="adm-inp text-xs"
             />
           </div>
-
-          <FField label="Sıra No">
-            <input type="number" value={form.sort_order} onChange={e => set({ sort_order: Number(e.target.value) })} className="adm-inp" />
-          </FField>
 
           <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
             <div><div className="text-sm text-foreground">Aktif</div><div className="text-xs text-muted-foreground mt-0.5">{form.active ? "Menüde görünür" : "Gizli"}</div></div>

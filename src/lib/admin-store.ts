@@ -14,7 +14,6 @@ export type AdminItem = {
   category: string;
   img: string;
   available: boolean;
-  sort_order: number;
 };
 
 export const CATEGORY_OPTIONS = categories.map((c) => ({ id: c.id, title: c.title["TR"] }));
@@ -32,7 +31,6 @@ const seed: AdminItem[] = categories.flatMap((c, ci) =>
     category: c.id,
     img: it.img,
     available: true,
-    sort_order: ci * 100 + idx,
   })),
 );
 
@@ -54,7 +52,7 @@ export function useAdminItems() {
       supabase
         .from("menu_items")
         .select("*")
-        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false })
         .then(({ data, error }: { data: null | Array<Record<string, unknown>>; error: null | { message: string } }) => {
           clearTimeout(abortTimer);
           if (!error && data && data.length > 0) {
@@ -71,7 +69,6 @@ export function useAdminItems() {
                 category: String(r.category ?? ""),
                 img: String(r.img_url ?? ""),
                 available: Boolean(r.available ?? true),
-                sort_order: Number(r.sort_order ?? 0),
               })),
             );
           } else {
@@ -85,8 +82,6 @@ export function useAdminItems() {
           setLoading(false);
         });
     } else {
-      // Defer synchronous localStorage work with setTimeout(0) so the first
-      // paint completes before JSON.parse blocks the main thread.
       const id = setTimeout(() => {
         try {
           const raw = localStorage.getItem(LS_KEY);
@@ -124,13 +119,13 @@ export function useAdminItems() {
         setItems((prev) => {
           const exists = prev.find((i) => i.id === item.id);
           if (exists) return prev.map((i) => (i.id === item.id ? item : i));
-          return [{ ...item, id: `custom-${Date.now()}` }, ...prev];
+          return [{ ...item, id: `custom-${Date.now()}` }, ...prev.filter(i => i.id !== item.id)];
         });
         return {};
       }
 
       if (!isUUID(item.id)) {
-        // New item
+        // New item (or seed item being saved to DB for the first time)
         const { data, error } = await supabase
           .from("menu_items")
           .insert({
@@ -143,32 +138,31 @@ export function useAdminItems() {
             category: item.category,
             price: item.price,
             img_url: item.img,
-            available: item.available,
-            sort_order: item.sort_order,
+            available: true,
           })
           .select()
           .single();
         if (error) return { error: error.message };
         const newId = (data as Record<string, unknown>).id as string;
-        setItems((prev) => [{ ...item, id: newId }, ...prev]);
+        // Remove the old seed entry (same old id) and prepend the new Supabase item
+        setItems((prev) => [{ ...item, id: newId, available: true }, ...prev.filter(i => i.id !== item.id)]);
         return {};
       }
 
-      // Update existing
+      // Update existing Supabase item
       const { error } = await supabase
         .from("menu_items")
         .update({
           name_tr: item.name,
-          name_bg: item.name_bg,
-          name_gr: item.name_gr,
+          name_bg: item.name_bg || item.name,
+          name_gr: item.name_gr || item.name,
           desc_tr: item.desc,
-          desc_bg: item.desc_bg,
-          desc_gr: item.desc_gr,
+          desc_bg: item.desc_bg || item.desc,
+          desc_gr: item.desc_gr || item.desc,
           category: item.category,
           price: item.price,
           img_url: item.img,
           available: item.available,
-          sort_order: item.sort_order,
           updated_at: new Date().toISOString(),
         })
         .eq("id", item.id);
@@ -179,11 +173,13 @@ export function useAdminItems() {
     [],
   );
 
-  const deleteItem = useCallback(async (id: string): Promise<void> => {
+  const deleteItem = useCallback(async (id: string): Promise<{ error?: string }> => {
     if (isSupabaseConfigured) {
-      await supabase.from("menu_items").delete().eq("id", id);
+      const { error } = await supabase.from("menu_items").delete().eq("id", id);
+      if (error) return { error: error.message };
     }
     setItems((prev) => prev.filter((i) => i.id !== id));
+    return {};
   }, []);
 
   const toggleAvail = useCallback(
@@ -206,9 +202,6 @@ export function useAdminItems() {
     [],
   );
 
-  // Yüklenen itemlardan dinamik kategori listesi türet.
-  // Supabase'deki kategori ID'leri Türkçe ise onları göster;
-  // kod'daki hardcoded ID'lerle eşleşirse o başlığı kullan.
   const categoryOptions = useMemo<{ id: string; title: string }[]>(() => {
     if (items.length === 0) return CATEGORY_OPTIONS;
     const seen = new Map<string, string>();

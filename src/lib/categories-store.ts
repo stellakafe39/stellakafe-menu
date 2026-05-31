@@ -74,7 +74,6 @@ export function useLiveCategories() {
       title_tr: cat.title_tr, title_bg: cat.title_bg, title_gr: cat.title_gr,
       subtitle_tr: cat.subtitle_tr, subtitle_bg: cat.subtitle_bg, subtitle_gr: cat.subtitle_gr,
       cover_img: cat.cover_img,
-      sort_order: cat.sort_order,
       active: cat.active,
     };
     const { error } = await supabase.from("categories").upsert(payload, { onConflict: "id" });
