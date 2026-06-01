@@ -840,6 +840,15 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
   const [view, setView] = useState<AdminView>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const adminData = useAdminItems();
+  const { adminCats } = useLiveCategories();
+
+  // Use DB categories (includes user-created ones) for the product form dropdown.
+  // Falls back to the static CATEGORY_OPTIONS list if DB hasn't loaded yet.
+  const liveCategoryOptions = useMemo(() => {
+    const active = adminCats.filter(c => c.active);
+    if (active.length === 0) return adminData.categoryOptions;
+    return active.map(c => ({ id: c.id, title: c.title_tr }));
+  }, [adminCats, adminData.categoryOptions]);
 
   const nav = [
     { id: "dashboard"  as AdminView, label: "Kontrol Paneli",    icon: LayoutDashboard },
@@ -917,8 +926,8 @@ function AuthedAdmin({ onSignOut }: { onSignOut: () => void }) {
           </div>
         </header>
         <main className="flex-1 p-4 lg:p-8 overflow-x-hidden overflow-y-auto">
-          {view === "dashboard"  && <DashboardView {...adminData} setView={setView} />}
-          {view === "menu"       && <MenuView {...adminData} />}
+          {view === "dashboard"  && <DashboardView {...adminData} categoryOptions={liveCategoryOptions} setView={setView} />}
+          {view === "menu"       && <MenuView {...adminData} categoryOptions={liveCategoryOptions} />}
           {view === "categories" && <CategoryView />}
           {view === "settings"   && <SettingsView />}
         </main>
